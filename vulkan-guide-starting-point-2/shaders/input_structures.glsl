@@ -16,6 +16,11 @@ layout(set=1, binding=0) uniform GLTFMaterialData
 	vec4 metalRoughFactors;
 } materialData;
 
+layout(set =1, binding=3) uniform VolumetricData
+{
+    float test;
+} volumetricData;
+
 struct LightStruct
 {
     vec3 position;
