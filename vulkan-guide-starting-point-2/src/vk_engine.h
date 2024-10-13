@@ -42,11 +42,6 @@ struct GLTFMetallic_Roughness
 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
 };
 
-struct VolumetricData
-{
-	float test;
-};
-
 struct Volumetric
 {
 	MaterialPipeline volumetricPipeline;
@@ -61,8 +56,8 @@ struct Volumetric
 
 	struct MaterialResources
 	{
-		VkBuffer volumetricBuffer;
-		uint32_t volumetricBufferOffset;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
 	};
 
 	DescriptorWriter writer;
@@ -70,7 +65,7 @@ struct Volumetric
 	void build_pipelines(VulkanEngine* engine);
 	void clear_resources(VkDevice device);
 
-	MaterialInstance write_data(VkDevice device, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
+	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
 };
 
 struct RenderObject
@@ -87,6 +82,7 @@ struct RenderObject
 
 struct DrawContext
 {
+
 	std::vector<RenderObject> OpaqueSurfaces;
 	std::vector<RenderObject> TransparentSurfaces;
 };
@@ -168,6 +164,8 @@ public:
 
 	GLTFMetallic_Roughness metalRoughMaterial;
 
+	//volumetrics
+	Volumetric volumetricMaterial;
 
 	//image samplers
 	VkSampler _defaultSamplerLinear;
@@ -197,12 +195,6 @@ public:
 
 	std::vector <std::shared_ptr<MeshAsset>> testMeshes;
 
-	//volumetrics
-	GPUMeshBuffers volumetricCube;
-	VkPipelineLayout _volumetricPipelineLayout;
-	VkPipeline _volumetricPipeline;
-	VkDescriptorSetLayout _volumetricDescriptorLayout;
-
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
@@ -227,15 +219,11 @@ public:
 
 	void draw_geometry(VkCommandBuffer cmd);
 
-	void draw_volumetrics(VkCommandBuffer cmd);
-
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
 	void update_scene();
-
-	void update_volumetrics();
 
 	//run main loop
 	void run();
@@ -261,9 +249,7 @@ private:
 	void init_pipelines();
 	void init_background_pipelines();
 	void init_mesh_pipeline();
-	void init_volumetric_pipeline();
 	void init_default_data();
-	void init_volumetric_data();
 	void init_imgui();
 
 	void create_swapchain(uint32_t width, uint32_t height);
