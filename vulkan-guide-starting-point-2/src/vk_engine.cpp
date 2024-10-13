@@ -372,7 +372,6 @@ void VulkanEngine::init_pipelines()
 
     metalRoughMaterial.build_pipelines(this);
 
-    volumetricMaterial.build_pipelines(this);
 }
 
 void VulkanEngine::init_background_pipelines()
@@ -1130,11 +1129,13 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
             for (const auto& l : sceneLights)
             {
-                if (lightData.numLights < 10)
+                //if (is_light_affecting_object(l, draw) == true)
                 {
-                    lightData.lights[lightData.numLights++] = l;
+                    if (lightData.numLights < 10)
+                    {
+                        lightData.lights[lightData.numLights++] = l;
+                    }
                 }
-                
             }
 
             //todo 
@@ -1360,7 +1361,6 @@ void VulkanEngine::cleanup()
         }
 
         metalRoughMaterial.clear_resources(_device);
-        volumetricMaterial.clear_resources(_device);
 
         _mainDeletionQueue.flush();
 
@@ -1388,22 +1388,12 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     {
         fmt::print("Error when building the mesh fragment shader module \n");
     }
-    else
-    {
-        fmt::print("Mesh fragment shader successfully loaded \n");
-    }
 
     VkShaderModule meshVertexShader;
     if (!vkutil::load_shader_module("../../shaders/mesh.vert.spv", engine->_device, &meshVertexShader))
     {
         fmt::print("Error when building the mesh vertex shader module \n");
     }
-    else
-    {
-        fmt::print("Mesh vertex shader successfully loaded \n");
-    }
-
-    
 
     VkPushConstantRange bufferRange{};
     bufferRange.offset = 0;
@@ -1487,99 +1477,6 @@ MaterialInstance GLTFMetallic_Roughness::write_material(VkDevice device, Materia
     writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.write_image(1, resources.colorImage.imageView, resources.colorSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     writer.write_image(2, resources.metalRoughImage.imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-
-    writer.update_set(device, matData.materialSet);
-
-    return matData;
-}
-
-void Volumetric::build_pipelines(VulkanEngine* engine)
-{
-    VkShaderModule volumetricFragShader;
-    if (!vkutil::load_shader_module("../../shaders/cloud.frag.spv", engine->_device, &volumetricFragShader))
-    {
-        fmt::print("Error when building the volumetric fragment shader module \n");
-    }
-    else
-    {
-        fmt::print("Volumetric fragment shader successfully loaded \n");
-    }
-
-    VkShaderModule volumetricVertexShader;
-    if (!vkutil::load_shader_module("../../shaders/cloud.vert.spv", engine->_device, &volumetricVertexShader))
-    {
-        fmt::print("Error when building the volumetric vertex shader module \n");
-    }
-    else
-    {
-        fmt::print("Volumetric vertex shader successfully loaded \n");
-    }
-
-
-    VkPushConstantRange bufferRange{};
-    bufferRange.offset = 0;
-    bufferRange.size = sizeof(GPUDrawPushConstants);
-    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-
-    materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout, engine->_gpuLightDataDescriptorLayout };
-
-    VkPipelineLayoutCreateInfo meshLayoutInfo = vkinit::pipeline_layout_create_info();
-    meshLayoutInfo.setLayoutCount = 3;
-    meshLayoutInfo.pSetLayouts = layouts;
-    meshLayoutInfo.pPushConstantRanges = &bufferRange;
-    meshLayoutInfo.pushConstantRangeCount = 1;
-
-    VkPipelineLayout newLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->_device, &meshLayoutInfo, nullptr, &newLayout));
-
-    volumetricPipeline.layout = newLayout;
-
-    PipelineBuilder pipelineBuilder;
-
-
-    pipelineBuilder.set_shaders(volumetricVertexShader, volumetricFragShader);
-    pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-    pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    pipelineBuilder.set_multisampling_none();
-    pipelineBuilder.disable_blending();
-    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-    pipelineBuilder.set_color_attachment_format(engine->_drawImage.imageFormat);
-    pipelineBuilder.set_depth_format(engine->_depthImage.imageFormat);
-
-    pipelineBuilder._pipelineLayout = newLayout;
-
-    volumetricPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
-
-    vkDestroyShaderModule(engine->_device, volumetricFragShader, nullptr);
-    vkDestroyShaderModule(engine->_device, volumetricVertexShader, nullptr);
-}
-void Volumetric::clear_resources(VkDevice device)
-{
-    vkDestroyDescriptorSetLayout(device, materialLayout, nullptr);
-    vkDestroyPipelineLayout(device, volumetricPipeline.layout, nullptr);
-
-    vkDestroyPipeline(device, volumetricPipeline.pipeline, nullptr);
-
-}
-
-MaterialInstance Volumetric::write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator)
-{
-    MaterialInstance matData;
-    matData.passType = pass;
-
-    matData.pipeline = &volumetricPipeline;
-    matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
-
-    writer.clear();
-    writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
     writer.update_set(device, matData.materialSet);
 

@@ -42,32 +42,6 @@ struct GLTFMetallic_Roughness
 	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
 };
 
-struct Volumetric
-{
-	MaterialPipeline volumetricPipeline;
-
-	VkDescriptorSetLayout materialLayout;
-
-	struct MaterialConstants
-	{
-		glm::vec4 colorFactors;
-		glm::vec4 extra[30];
-	};
-
-	struct MaterialResources
-	{
-		VkBuffer dataBuffer;
-		uint32_t dataBufferOffset;
-	};
-
-	DescriptorWriter writer;
-
-	void build_pipelines(VulkanEngine* engine);
-	void clear_resources(VkDevice device);
-
-	MaterialInstance write_material(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
-};
-
 struct RenderObject
 {
 	uint32_t indexCount;
@@ -163,9 +137,6 @@ public:
 	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
 	GLTFMetallic_Roughness metalRoughMaterial;
-
-	//volumetrics
-	Volumetric volumetricMaterial;
 
 	//image samplers
 	VkSampler _defaultSamplerLinear;
