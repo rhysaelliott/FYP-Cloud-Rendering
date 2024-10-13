@@ -47,31 +47,6 @@ struct VolumetricData
 	float test;
 };
 
-struct Volumetric
-{
-	MaterialPipeline volumetricPipeline;
-
-	VkDescriptorSetLayout materialLayout;
-
-	struct MaterialConstants
-	{
-		glm::vec4 colorFactors;
-		glm::vec4 extra[30];
-	};
-
-	struct MaterialResources
-	{
-		VkBuffer volumetricBuffer;
-		uint32_t volumetricBufferOffset;
-	};
-
-	DescriptorWriter writer;
-
-	void build_pipelines(VulkanEngine* engine);
-	void clear_resources(VkDevice device);
-
-	MaterialInstance write_data(VkDevice device, const MaterialResources& resources, DescriptorAllocatorGrowable descriptorAllocator);
-};
 
 struct RenderObject
 {
@@ -83,12 +58,14 @@ struct RenderObject
 	Bounds bounds;
 	glm::mat4 transform;
 	VkDeviceAddress vertexBufferAddress;
+	GPUMeshBuffers meshBuffer;
 };
 
 struct DrawContext
 {
 	std::vector<RenderObject> OpaqueSurfaces;
 	std::vector<RenderObject> TransparentSurfaces;
+	std::vector<RenderObject> VolumetricSurfaces;
 };
 
 struct EngineStats
@@ -198,10 +175,9 @@ public:
 	std::vector <std::shared_ptr<MeshAsset>> testMeshes;
 
 	//volumetrics
-	GPUMeshBuffers volumetricCube;
-	VkPipelineLayout _volumetricPipelineLayout;
-	VkPipeline _volumetricPipeline;
+	MaterialPipeline _volumetricPipeline;
 	VkDescriptorSetLayout _volumetricDescriptorLayout;
+	MaterialInstance _volumetricMaterial;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
@@ -226,8 +202,6 @@ public:
 	void draw_background(VkCommandBuffer cmd);
 
 	void draw_geometry(VkCommandBuffer cmd);
-
-	void draw_volumetrics(VkCommandBuffer cmd);
 
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 

@@ -129,7 +129,7 @@ VkSamplerMipmapMode extractMipmapMode(fastgltf::Filter filter)
 
 std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::string_view filePath)
 {
-	fmt::print("Loading GLTF: {}", filePath);
+	fmt::print("Loading GLTF: {}\n", filePath);
 
 	std::shared_ptr<LoadedGLTF> scene = std::make_shared<LoadedGLTF>();
 	scene->creator = engine;

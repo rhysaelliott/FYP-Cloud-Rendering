@@ -192,7 +192,10 @@ void VulkanEngine::init_vulkan()
 
     _mainDeletionQueue.push_function([&]()
         {
-            vmaDestroyAllocator(_allocator);
+            if (_allocator != VK_NULL_HANDLE)
+            {
+                vmaDestroyAllocator(_allocator);
+            }
         });
 }
 
@@ -564,11 +567,14 @@ void VulkanEngine::init_volumetric_pipeline()
     pipeline_layout_info.pSetLayouts = layouts;
     pipeline_layout_info.setLayoutCount = 2;
 
-    VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_volumetricPipelineLayout));
+    VkPipelineLayout pipelineLayout;
+
+    VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &pipelineLayout));
+    _volumetricPipeline.layout = pipelineLayout;
 
     PipelineBuilder pipelineBuilder;
 
-    pipelineBuilder._pipelineLayout = _volumetricPipelineLayout;
+    pipelineBuilder._pipelineLayout = pipelineLayout;
     pipelineBuilder.set_shaders(volumetricVertexShader, volumetricFragShader);
     pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
@@ -582,12 +588,10 @@ void VulkanEngine::init_volumetric_pipeline()
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
 
+    _volumetricPipeline.pipeline = pipelineBuilder.build_pipeline(_device);
+ 
 
-    _volumetricPipeline = pipelineBuilder.build_pipeline(_device);
-    if (_volumetricPipeline == VK_NULL_HANDLE)
-    {
-        fmt::print("Error with volumetric pipeline creation\n");
-    }
+
 
     vkDestroyShaderModule(_device, volumetricVertexShader, nullptr);
     vkDestroyShaderModule(_device, volumetricFragShader, nullptr);
@@ -595,8 +599,8 @@ void VulkanEngine::init_volumetric_pipeline()
     _mainDeletionQueue.push_function([&]()
         {
             vkDestroyDescriptorSetLayout(_device, _volumetricDescriptorLayout, nullptr);
-            vkDestroyPipelineLayout(_device, _volumetricPipelineLayout, nullptr);
-            vkDestroyPipeline(_device, _volumetricPipeline, nullptr);
+            vkDestroyPipelineLayout(_device, _volumetricPipeline.layout, nullptr);
+            vkDestroyPipeline(_device, _volumetricPipeline.pipeline, nullptr);
         });
 }
 
@@ -705,11 +709,29 @@ void VulkanEngine::init_volumetric_data()
         // Bottom face
         4, 5, 1, 1, 0, 4
     };
+    GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
-    volumetricCube= upload_mesh(indices, vertices);
+    RenderObject obj;
+    
+    _volumetricMaterial.passType = MaterialPass::Volumetric;
+    _volumetricMaterial.pipeline = &_volumetricPipeline;
+ //   _volumetricMaterial.materialSet = &_volumetricDescriptorLayout;
+    //todo work out the descriptor set
+
+    obj.indexCount = 36;
+    obj.firstIndex = 0;
+    obj.indexBuffer = mesh.indexBuffer.buffer;
+    obj.material = &_volumetricMaterial;
+    //todo transform
+    //def.transform = nodeMatrix;
+    obj.transform = glm::mat4{ 1.f };
+    obj.vertexBufferAddress = mesh.vertexBufferAddress;
+    obj.meshBuffer = mesh;
+
+    mainDrawContext.VolumetricSurfaces.push_back(obj);
+
     _mainDeletionQueue.push_function([&]() {
-        destroy_buffer(volumetricCube.indexBuffer);
-        destroy_buffer(volumetricCube.vertexBuffer);
+
         });
 }
 
@@ -1080,7 +1102,6 @@ void VulkanEngine::draw()
 
     draw_geometry(cmd);
 
-    draw_volumetrics(cmd);
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1150,6 +1171,7 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
+    //todo volumetric culling
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
@@ -1226,7 +1248,9 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 {
                     lastPipeline = draw.material->pipeline;
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+                    
 
                     VkViewport viewport = {};
                     viewport.x = 0;
@@ -1246,7 +1270,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
                 }
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                if (draw.material->passType != MaterialPass::Volumetric)
+                {
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                }
             }
 
             if (draw.indexBuffer != lastIndexBuffer)
@@ -1259,20 +1286,24 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             //handle light data
             //todo sort light buffer
             //todo clear light data
-            std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
-            lightData.numLights = 0;
-
-            for (const auto& l : sceneLights)
+            if (draw.material->passType != MaterialPass::Volumetric)
             {
-                if (lightData.numLights < 10)
+                std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+                lightData.numLights = 0;
+
+                for (const auto& l : sceneLights)
                 {
-                    lightData.lights[lightData.numLights++] = l;
+                    if (lightData.numLights < 10)
+                    {
+                        lightData.lights[lightData.numLights++] = l;
+                    }
+
                 }
-                
+
+                *lightBufferData = lightData;
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
             }
 
-            *lightBufferData = lightData;
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
             
 
 
@@ -1288,41 +1319,16 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
         };
 
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _volumetricPipeline);
-
-    GPUDrawPushConstants push_constants;
-    push_constants.worldMatrix = glm::mat4{ 1.f };
-    push_constants.vertexBuffer = volumetricCube.vertexBufferAddress;
-
-    vkCmdPushConstants(cmd, _volumetricPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &push_constants);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _volumetricPipelineLayout, 0, 1, &globalDescriptor, 0, nullptr);
-    vkCmdBindIndexBuffer(cmd, volumetricCube.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-    VkViewport viewport = {};
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = _drawExtent.width;
-    viewport.height = _drawExtent.height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent.width = _drawExtent.width;
-    scissor.extent.height = _drawExtent.height;
-
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    vkCmdDrawIndexed(cmd, 36, 1, 0, 0, 0);
 
     for (auto r : opaqueDraws)
     {
           draw(mainDrawContext.OpaqueSurfaces[r]);
     }
     for (auto r : mainDrawContext.TransparentSurfaces)
+    {
+        draw(r);
+    }
+    for (auto r : mainDrawContext.VolumetricSurfaces)
     {
         draw(r);
     }
@@ -1342,13 +1348,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     vkCmdEndRendering(cmd);
 }
 
-void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
-{
-    //todo
-
-
-
-}
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
 {
@@ -1527,6 +1526,13 @@ void VulkanEngine::cleanup()
         {
             destroy_buffer(mesh->meshBuffers.indexBuffer);
             destroy_buffer(mesh->meshBuffers.vertexBuffer);
+        }
+
+        for (int i =0;i<mainDrawContext.VolumetricSurfaces.size();i++)
+        {
+            destroy_buffer(mainDrawContext.VolumetricSurfaces[i].meshBuffer.indexBuffer);
+            destroy_buffer(mainDrawContext.VolumetricSurfaces[i].meshBuffer.vertexBuffer);
+
         }
 
         metalRoughMaterial.clear_resources(_device);
