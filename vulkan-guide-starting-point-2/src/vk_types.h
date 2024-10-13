@@ -171,6 +171,7 @@ enum class MaterialPass : uint8_t
 {
 	MainColor,
 	Transparent,
+	Volumetric,
 	Other
 };
 
