@@ -119,6 +119,8 @@ void VulkanEngine::init()
 
     init_volumetric_data();
 
+    init_billboard_data();
+
     init_imgui();
 
     std::string structurePath = { "..\\..\\assets\\basicmesh.glb" };
@@ -377,6 +379,8 @@ void VulkanEngine::init_pipelines()
 
     init_volumetric_pipeline();
 
+    init_billboard_pipeline();
+
     metalRoughMaterial.build_pipelines(this);
 
 }
@@ -604,6 +608,87 @@ void VulkanEngine::init_volumetric_pipeline()
         });
 }
 
+//todo
+void VulkanEngine::init_billboard_pipeline()
+{
+    //todo 
+    VkShaderModule billboardFragShader;
+    if (!vkutil::load_shader_module("../../shaders/cloud.frag.spv", _device, &billboardFragShader))
+    {
+        fmt::print("Error when building the billboard fragment shader module \n");
+    }
+    else
+    {
+        fmt::print("Billboard fragment shader successfully loaded \n");
+    }
+
+    VkShaderModule billboardVertexShader;
+    if (!vkutil::load_shader_module("../../shaders/cloud.vert.spv", _device, &billboardVertexShader))
+    {
+        fmt::print("Error when building the billboard vertex shader module \n");
+    }
+    else
+    {
+        fmt::print("Billboard vertex shader successfully loaded \n");
+    }
+
+    VkPushConstantRange bufferRange{};
+    bufferRange.offset = 0;
+    bufferRange.size = sizeof(GPUDrawPushConstants);
+    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    DescriptorLayoutBuilder layoutBuilder;
+    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _gpuLightDataDescriptorLayout };
+
+    //todo change this stuff
+    VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
+    pipeline_layout_info.pPushConstantRanges = &bufferRange;
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pSetLayouts = layouts;
+    pipeline_layout_info.setLayoutCount = 2;
+
+    VkPipelineLayout pipelineLayout;
+
+    VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &pipelineLayout));
+    _billboardPipeline.layout = pipelineLayout;
+
+    PipelineBuilder pipelineBuilder;
+
+    pipelineBuilder._pipelineLayout = pipelineLayout;
+    pipelineBuilder.set_shaders(billboardVertexShader, billboardFragShader);
+    pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
+    pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipelineBuilder.set_multisampling_none();
+    //pipelineBuilder.disable_blending();
+    pipelineBuilder.enable_blending_alphablend();
+    //pipelineBuilder.disable_depthtest();
+    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+
+    pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
+    pipelineBuilder.set_depth_format(_depthImage.imageFormat);
+
+    _billboardPipeline.pipeline = pipelineBuilder.build_pipeline(_device);
+
+
+
+
+    vkDestroyShaderModule(_device, billboardVertexShader, nullptr);
+    vkDestroyShaderModule(_device, billboardFragShader, nullptr);
+
+    _mainDeletionQueue.push_function([&]()
+        {
+            vkDestroyDescriptorSetLayout(_device, _billboardDescriptorLayout, nullptr);
+            vkDestroyPipelineLayout(_device, _billboardPipeline.layout, nullptr);
+            vkDestroyPipeline(_device, _billboardPipeline.pipeline, nullptr);
+        });
+}
+
 void VulkanEngine::init_default_data()
 {
 
@@ -729,6 +814,63 @@ void VulkanEngine::init_volumetric_data()
     obj.meshBuffer = mesh;
 
     mainDrawContext.VolumetricSurfaces.push_back(obj);
+
+    _mainDeletionQueue.push_function([&]() {
+
+        });
+}
+
+//todo
+void VulkanEngine::init_billboard_data()
+{
+    //todo create rectangle vertices 
+    std::array<Vertex, 8> vertices = {
+        // Front face
+        Vertex{{-1.0f, -1.0f,  1.0f}}, // 0: bottom-left front
+        Vertex{{ 1.0f, -1.0f,  1.0f}}, // 1: bottom-right front
+        Vertex{{ 1.0f,  1.0f,  1.0f}}, // 2: top-right front
+        Vertex{{-1.0f,  1.0f,  1.0f}}, // 3: top-left front
+        // Back face
+        Vertex{{-1.0f, -1.0f, -1.0f}}, // 4: bottom-left back
+        Vertex{{ 1.0f, -1.0f, -1.0f}}, // 5: bottom-right back
+        Vertex{{ 1.0f,  1.0f, -1.0f}}, // 6: top-right back
+        Vertex{{-1.0f,  1.0f, -1.0f}}  // 7: top-left back
+    };
+
+    std::array<uint32_t, 36> indices = {
+        // Front face
+        0, 1, 2, 2, 3, 0,
+        // Back face
+        4, 5, 6, 6, 7, 4,
+        // Left face
+        4, 0, 3, 3, 7, 4,
+        // Right face
+        1, 5, 6, 6, 2, 1,
+        // Top face
+        3, 2, 6, 6, 7, 3,
+        // Bottom face
+        4, 5, 1, 1, 0, 4
+    };
+    GPUMeshBuffers mesh = upload_mesh(indices, vertices);
+
+    RenderObject obj;
+
+    _billboardMaterial.passType = MaterialPass::Billboard;
+    _billboardMaterial.pipeline = &_billboardPipeline;
+    //   _billboardMaterial.materialSet = &_billboardDescriptorLayout;
+       //todo work out the descriptor set
+
+    obj.indexCount = 36;
+    obj.firstIndex = 0;
+    obj.indexBuffer = mesh.indexBuffer.buffer;
+    obj.material = &_billboardMaterial;
+    //todo transform
+    //def.transform = nodeMatrix;
+    obj.transform = glm::mat4{ 1.f };
+    obj.vertexBufferAddress = mesh.vertexBufferAddress;
+    obj.meshBuffer = mesh;
+
+    mainDrawContext.BillboardSurfaces.push_back(obj);
 
     _mainDeletionQueue.push_function([&]() {
 
@@ -1025,8 +1167,6 @@ void VulkanEngine::update_scene()
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
 
-    //loadedNodes["Suzanne"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
-
     //loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
@@ -1272,7 +1412,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 }
                 if (draw.material->passType != MaterialPass::Volumetric)
                 {
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                    if (draw.material->passType != MaterialPass::Billboard)
+                    {
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                    }
                 }
             }
 
@@ -1288,20 +1431,23 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             //todo clear light data
             if (draw.material->passType != MaterialPass::Volumetric)
             {
-                std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
-                lightData.numLights = 0;
-
-                for (const auto& l : sceneLights)
+                if (draw.material->passType != MaterialPass::Billboard)
                 {
-                    if (lightData.numLights < 10)
+                    std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+                    lightData.numLights = 0;
+
+                    for (const auto& l : sceneLights)
                     {
-                        lightData.lights[lightData.numLights++] = l;
+                        if (lightData.numLights < 10)
+                        {
+                            lightData.lights[lightData.numLights++] = l;
+                        }
+
                     }
 
+                    *lightBufferData = lightData;
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
                 }
-
-                *lightBufferData = lightData;
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
             }
 
             
@@ -1332,6 +1478,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     {
         draw(r);
     }
+    for (auto r : mainDrawContext.BillboardSurfaces)
+    {
+        draw(r);
+    }
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
@@ -1347,7 +1497,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     vkCmdEndRendering(cmd);
 }
-
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
 {
@@ -1532,6 +1681,12 @@ void VulkanEngine::cleanup()
         {
             destroy_buffer(mainDrawContext.VolumetricSurfaces[i].meshBuffer.indexBuffer);
             destroy_buffer(mainDrawContext.VolumetricSurfaces[i].meshBuffer.vertexBuffer);
+        }
+
+        for (int i = 0; i < mainDrawContext.BillboardSurfaces.size(); i++)
+        {
+            destroy_buffer(mainDrawContext.BillboardSurfaces[i].meshBuffer.indexBuffer);
+            destroy_buffer(mainDrawContext.BillboardSurfaces[i].meshBuffer.vertexBuffer);
 
         }
 

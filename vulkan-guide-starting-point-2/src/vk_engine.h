@@ -61,11 +61,13 @@ struct RenderObject
 	GPUMeshBuffers meshBuffer;
 };
 
+
 struct DrawContext
 {
 	std::vector<RenderObject> OpaqueSurfaces;
 	std::vector<RenderObject> TransparentSurfaces;
 	std::vector<RenderObject> VolumetricSurfaces;
+	std::vector<RenderObject> BillboardSurfaces;
 };
 
 struct EngineStats
@@ -179,6 +181,12 @@ public:
 	VkDescriptorSetLayout _volumetricDescriptorLayout;
 	MaterialInstance _volumetricMaterial;
 
+	//billboards
+	MaterialPipeline _billboardPipeline;
+	VkDescriptorSetLayout _billboardDescriptorLayout;
+	MaterialInstance _billboardMaterial;
+
+
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
@@ -236,8 +244,10 @@ private:
 	void init_background_pipelines();
 	void init_mesh_pipeline();
 	void init_volumetric_pipeline();
+	void init_billboard_pipeline();
 	void init_default_data();
 	void init_volumetric_data();
+	void init_billboard_data();
 	void init_imgui();
 
 	void create_swapchain(uint32_t width, uint32_t height);
