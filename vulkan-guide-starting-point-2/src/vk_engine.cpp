@@ -608,12 +608,12 @@ void VulkanEngine::init_volumetric_pipeline()
         });
 }
 
-//todo
+//todo add texture support
 void VulkanEngine::init_billboard_pipeline()
 {
     //todo 
     VkShaderModule billboardFragShader;
-    if (!vkutil::load_shader_module("../../shaders/cloud.frag.spv", _device, &billboardFragShader))
+    if (!vkutil::load_shader_module("../../shaders/billboard.frag.spv", _device, &billboardFragShader))
     {
         fmt::print("Error when building the billboard fragment shader module \n");
     }
@@ -623,7 +623,7 @@ void VulkanEngine::init_billboard_pipeline()
     }
 
     VkShaderModule billboardVertexShader;
-    if (!vkutil::load_shader_module("../../shaders/cloud.vert.spv", _device, &billboardVertexShader))
+    if (!vkutil::load_shader_module("../../shaders/billboard.vert.spv", _device, &billboardVertexShader))
     {
         fmt::print("Error when building the billboard vertex shader module \n");
     }
@@ -803,7 +803,7 @@ void VulkanEngine::init_volumetric_data()
  //   _volumetricMaterial.materialSet = &_volumetricDescriptorLayout;
     //todo work out the descriptor set
 
-    obj.indexCount = 36;
+    obj.indexCount = indices.size();
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
@@ -820,36 +820,19 @@ void VulkanEngine::init_volumetric_data()
         });
 }
 
-//todo
 void VulkanEngine::init_billboard_data()
 {
-    //todo create rectangle vertices 
-    std::array<Vertex, 8> vertices = {
-        // Front face
-        Vertex{{-1.0f, -1.0f,  1.0f}}, // 0: bottom-left front
-        Vertex{{ 1.0f, -1.0f,  1.0f}}, // 1: bottom-right front
-        Vertex{{ 1.0f,  1.0f,  1.0f}}, // 2: top-right front
-        Vertex{{-1.0f,  1.0f,  1.0f}}, // 3: top-left front
-        // Back face
-        Vertex{{-1.0f, -1.0f, -1.0f}}, // 4: bottom-left back
-        Vertex{{ 1.0f, -1.0f, -1.0f}}, // 5: bottom-right back
-        Vertex{{ 1.0f,  1.0f, -1.0f}}, // 6: top-right back
-        Vertex{{-1.0f,  1.0f, -1.0f}}  // 7: top-left back
+
+    std::array<Vertex, 4> vertices = {
+        Vertex{{-1.0f, -1.0f, 0.0f}}, 
+        Vertex{{ 1.0f, -1.0f, 0.0f}}, 
+        Vertex{{ 1.0f,  1.0f, 0.0f}}, 
+        Vertex{{-1.0f,  1.0f, 0.0f}}  
     };
 
-    std::array<uint32_t, 36> indices = {
-        // Front face
-        0, 1, 2, 2, 3, 0,
-        // Back face
-        4, 5, 6, 6, 7, 4,
-        // Left face
-        4, 0, 3, 3, 7, 4,
-        // Right face
-        1, 5, 6, 6, 2, 1,
-        // Top face
-        3, 2, 6, 6, 7, 3,
-        // Bottom face
-        4, 5, 1, 1, 0, 4
+    std::array<uint32_t, 6> indices = {
+        0, 1, 2, 
+        2, 3, 0   
     };
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
@@ -860,7 +843,7 @@ void VulkanEngine::init_billboard_data()
     //   _billboardMaterial.materialSet = &_billboardDescriptorLayout;
        //todo work out the descriptor set
 
-    obj.indexCount = 36;
+    obj.indexCount = indices.size();
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_billboardMaterial;
@@ -1182,6 +1165,7 @@ void VulkanEngine::update_scene()
     sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
 
     update_volumetrics();
+    update_billboards();
 
     auto end = std::chrono::system_clock::now();
 
@@ -1196,6 +1180,11 @@ void VulkanEngine::update_volumetrics()
     //create mesh node
     //mesh node has a mesh asset
     //call draw on the mesh node
+
+}
+
+void VulkanEngine::update_billboards()
+{
 
 }
 
@@ -1476,7 +1465,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     }
     for (auto r : mainDrawContext.VolumetricSurfaces)
     {
-        draw(r);
+        //todo add back later
+        //draw(r);
     }
     for (auto r : mainDrawContext.BillboardSurfaces)
     {

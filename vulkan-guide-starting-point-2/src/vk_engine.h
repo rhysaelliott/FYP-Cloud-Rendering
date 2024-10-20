@@ -219,6 +219,8 @@ public:
 
 	void update_volumetrics();
 
+	void update_billboards();
+
 	//run main loop
 	void run();
 
