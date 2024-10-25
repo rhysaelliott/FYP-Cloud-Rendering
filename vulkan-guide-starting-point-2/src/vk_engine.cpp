@@ -306,18 +306,27 @@ void VulkanEngine::init_descriptors()
 
     globalDescriptorAllocator.init_pool(_device, 10, sizes);
 
-    //descriptor set layout for compute draw
-    DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    _drawImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    {
+        //descriptor set layout for compute draw
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        _drawImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
 
-    //allocate descriptor set for draw image 
-    _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
+        //allocate descriptor set for draw image 
+        _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
 
-    DescriptorWriter writer;
-    writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        DescriptorWriter writer;
+        writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-    writer.update_set(_device, _drawImageDescriptors);
+        writer.update_set(_device, _drawImageDescriptors);
+    }
+
+
+
+
+
+    //todo init the billboard set descriptor here 
+
 
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
@@ -345,12 +354,12 @@ void VulkanEngine::init_descriptors()
         _gpuSceneDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
-
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
     }
+
 
     {
         DescriptorLayoutBuilder builder;
@@ -366,6 +375,7 @@ void VulkanEngine::init_descriptors()
             vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _billboardDescriptorLayout, nullptr);
         });
 }
 
@@ -639,11 +649,11 @@ void VulkanEngine::init_billboard_pipeline()
 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _gpuLightDataDescriptorLayout };
+    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _billboardDescriptorLayout};
 
     //todo change this stuff
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
@@ -651,6 +661,7 @@ void VulkanEngine::init_billboard_pipeline()
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pSetLayouts = layouts;
     pipeline_layout_info.setLayoutCount = 2;
+    
 
     VkPipelineLayout pipelineLayout;
 
@@ -824,10 +835,13 @@ void VulkanEngine::init_billboard_data()
 {
 
     std::array<Vertex, 4> vertices = {
-        Vertex{{-1.0f, -1.0f, 0.0f}}, 
-        Vertex{{ 1.0f, -1.0f, 0.0f}}, 
-        Vertex{{ 1.0f,  1.0f, 0.0f}}, 
-        Vertex{{-1.0f,  1.0f, 0.0f}}  
+ Vertex{{-1.0f, -1.0f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+
+ Vertex{{ 1.0f, -1.0f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f}},
+
+ Vertex{{ 1.0f,  1.0f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f}},
+
+ Vertex{{-1.0f,  1.0f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}
     };
 
     std::array<uint32_t, 6> indices = {
@@ -840,8 +854,7 @@ void VulkanEngine::init_billboard_data()
 
     _billboardMaterial.passType = MaterialPass::Billboard;
     _billboardMaterial.pipeline = &_billboardPipeline;
-    //   _billboardMaterial.materialSet = &_billboardDescriptorLayout;
-       //todo work out the descriptor set
+
 
     obj.indexCount = indices.size();
     obj.firstIndex = 0;
@@ -1399,12 +1412,22 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
                 }
+
+
+                if (draw.material->passType == MaterialPass::Billboard)
+                {
+                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardDescriptorLayout);
+                    DescriptorWriter writer;
+                    writer.write_image(1, _errorCheckImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+                    writer.update_set(_device, draw.material->materialSet);
+                }
+
                 if (draw.material->passType != MaterialPass::Volumetric)
                 {
-                    if (draw.material->passType != MaterialPass::Billboard)
-                    {
-                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
-                    }
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                    
                 }
             }
 

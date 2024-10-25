@@ -23,10 +23,10 @@ float saturate(in float num)
 void main()
 {
 
+	vec3 base = texture(colorTex, inUV).xyz;
 
 
 
 
-
-	outFragColor =vec4(1,0,0, 1.0f);
+	outFragColor =vec4(base, 1.0f);
 }
