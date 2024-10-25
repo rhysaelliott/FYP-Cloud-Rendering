@@ -128,7 +128,7 @@ void VulkanEngine::init()
 
     assert(structureFile.has_value());
 
-    //loadedScenes["structure"] = *structureFile;
+    loadedScenes["structure"] = *structureFile;
 
     // everything went fine
     _isInitialized = true;
@@ -648,10 +648,10 @@ void VulkanEngine::init_billboard_pipeline()
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex
+    layoutBuilder.add_binding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); //billboard pos data
 
-    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
+    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT| VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _billboardDescriptorLayout};
 
@@ -854,9 +854,11 @@ void VulkanEngine::init_billboard_data()
 
     _billboardMaterial.passType = MaterialPass::Billboard;
     _billboardMaterial.pipeline = &_billboardPipeline;
+    
 
 
     obj.indexCount = indices.size();
+    obj.instanceCount = 10;
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_billboardMaterial;
@@ -867,6 +869,11 @@ void VulkanEngine::init_billboard_data()
     obj.meshBuffer = mesh;
 
     mainDrawContext.BillboardSurfaces.push_back(obj);
+
+    for (int i = 0; i <= obj.instanceCount; i++)
+    {
+        _billboardData.billboardPos[i] =glm::vec4(glm::vec3(i),0);
+    }
 
     _mainDeletionQueue.push_function([&]() {
 
@@ -1163,7 +1170,7 @@ void VulkanEngine::update_scene()
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
 
-    //loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -1368,6 +1375,17 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, lightDescriptor);
 
+    VkDescriptorSet billboardDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _billboardDescriptorLayout);
+
+    //todo change this to be billboard stuff
+    AllocatedBuffer gpuBillboardBuffer = create_buffer(sizeof(BillboardData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    BillboardData* billboardBufferData = (BillboardData*)gpuBillboardBuffer.allocation->GetMappedData();
+    *billboardBufferData = _billboardData;
+
+    writer.write_buffer(4, gpuBillboardBuffer.buffer, sizeof(billboardBufferData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+    //writer.update_set(_device, billboardDescriptor);
+
     //reset counters
     stats.drawcallCount = 0;
     stats.triangleCount = 0;
@@ -1417,10 +1435,12 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 if (draw.material->passType == MaterialPass::Billboard)
                 {
                     draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardDescriptorLayout);
+
                     DescriptorWriter writer;
                     writer.write_image(1, _errorCheckImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-                    writer.update_set(_device, draw.material->materialSet);
+                    //todo pass positions for instanced rendering through
+                
                 }
 
                 if (draw.material->passType != MaterialPass::Volumetric)
@@ -1470,17 +1490,17 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             pushConstants.worldMatrix = draw.transform;
             vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
-            vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+            vkCmdDrawIndexed(cmd, draw.indexCount, draw.instanceCount, draw.firstIndex, 0, 0);
 
             stats.drawcallCount++;
-            stats.triangleCount += draw.indexCount / 3;
+            stats.triangleCount += (draw.indexCount * draw.instanceCount) / 3;
         };
 
 
 
     for (auto r : opaqueDraws)
     {
-          draw(mainDrawContext.OpaqueSurfaces[r]);
+          //draw(mainDrawContext.OpaqueSurfaces[r]);
     }
     for (auto r : mainDrawContext.TransparentSurfaces)
     {
@@ -1498,6 +1518,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
+        destroy_buffer(gpuBillboardBuffer);
         destroy_buffer(gpuLightBuffer);
         });
 
@@ -1846,6 +1867,7 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx)
         RenderObject def;
         def.indexCount = s.count;
         def.firstIndex = s.startIndex;
+        def.instanceCount = 1;
         def.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
         def.material = &s.material->data;
         def.bounds = s.bounds;

@@ -12,6 +12,7 @@ layout(location =3) in vec3 inPos;
 layout(location=0) out vec4 outFragColor;
 
 
+
 float saturate(in float num)
 {
 	return clamp(num, 0.0,1.0);
@@ -24,7 +25,7 @@ void main()
 {
 
 	vec3 base = texture(colorTex, inUV).xyz;
-
+	base = inColor;
 
 
 

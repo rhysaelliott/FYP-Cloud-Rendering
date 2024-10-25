@@ -21,6 +21,12 @@ layout(set =1, binding=3) uniform VolumetricData
     float test;
 } volumetricData;
 
+layout(set=1, binding= 4) uniform BillboardData
+{
+	vec4 position[10];
+
+} billboardData;
+
 struct LightStruct
 {
     vec3 position;

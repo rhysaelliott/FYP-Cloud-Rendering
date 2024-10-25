@@ -29,13 +29,20 @@ layout(push_constant) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
+
+
+
 void main()
 {
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 	
-	vec4 position = vec4(v.position,1.0f);
+	vec4 position = vec4(v.position + billboardData.position[gl_InstanceIndex].xyz,1.0);
 
-	mat4 modelView = sceneData.view * PushConstants.render_matrix;
+	mat4 translationMatrix = mat4(1.0);
+	translationMatrix[3] = vec4(billboardData.position[gl_InstanceIndex].xyz,1.0);
+
+
+	mat4 modelView = sceneData.view *translationMatrix *PushConstants.render_matrix;
 	modelView[0][0] = 1;
 	modelView[0][1] = 0;
 	modelView[0][2] = 0;
@@ -53,6 +60,11 @@ void main()
 
 	outNormal =	(PushConstants.render_matrix * vec4(v.normal,0.f)).xyz;
 	outColor = v.color.xyz;
+
+	outColor=vec3(1,0,0);
+
+	outColor=billboardData.position[9].xyz;
+
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 }

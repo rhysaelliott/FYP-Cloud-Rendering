@@ -47,11 +47,17 @@ struct VolumetricData
 	float test;
 };
 
+struct BillboardData
+{
+	glm::vec4 billboardPos[10];
+};
+
 
 struct RenderObject
 {
 	uint32_t indexCount;
 	uint32_t firstIndex;
+	uint32_t instanceCount;
 	VkBuffer indexBuffer;
 
 	MaterialInstance* material;
@@ -185,6 +191,7 @@ public:
 	MaterialPipeline _billboardPipeline;
 	VkDescriptorSetLayout _billboardDescriptorLayout;
 	MaterialInstance _billboardMaterial;
+	BillboardData _billboardData;
 
 
 	//triangle pipeline members
