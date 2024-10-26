@@ -864,13 +864,14 @@ void VulkanEngine::init_billboard_data()
 
 
     obj.indexCount = indices.size();
-    obj.instanceCount = 10;
+    obj.instanceCount = 128;
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_billboardMaterial;
     //todo transform
     //def.transform = nodeMatrix;
     obj.transform = glm::mat4{ 1.f };
+
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 

@@ -49,7 +49,7 @@ struct VolumetricData
 
 struct BillboardData
 {
-	glm::vec4 billboardPos[10];
+	glm::vec4 billboardPos[128];
 };
 
 
