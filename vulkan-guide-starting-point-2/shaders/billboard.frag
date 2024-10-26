@@ -25,7 +25,7 @@ void main()
 {
 
 	vec3 base = texture(colorTex, inUV).xyz;
-	base = inColor;
+	//base = inColor;
 
 
 

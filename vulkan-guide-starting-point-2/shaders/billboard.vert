@@ -29,7 +29,11 @@ layout(push_constant) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
+layout(set=2, binding= 0) uniform BillboardData
+{
+	vec4 position[10];
 
+} billboardData;
 
 
 void main()
@@ -62,8 +66,6 @@ void main()
 	outColor = v.color.xyz;
 
 	outColor=vec3(1,0,0);
-
-	outColor=billboardData.position[9].xyz;
 
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;

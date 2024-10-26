@@ -1,4 +1,6 @@
 
+layout(set =1, binding =1) uniform sampler2D colorTex;
+layout(set =1, binding =2) uniform sampler2D metalRoughTex;
 
 layout(set =0, binding =0) uniform SceneData
 {
@@ -16,16 +18,6 @@ layout(set=1, binding=0) uniform GLTFMaterialData
 	vec4 metalRoughFactors;
 } materialData;
 
-layout(set =1, binding=3) uniform VolumetricData
-{
-    float test;
-} volumetricData;
-
-layout(set=1, binding= 4) uniform BillboardData
-{
-	vec4 position[10];
-
-} billboardData;
 
 struct LightStruct
 {
@@ -47,5 +39,7 @@ layout(set=2, binding=0) uniform LightData
 	int numLights;
 } lightData;
 
-layout(set =1, binding =1) uniform sampler2D colorTex;
-layout(set =1, binding =2) uniform sampler2D metalRoughTex;
+layout(set =1, binding=3) uniform VolumetricData
+{
+    float test;
+} volumetricData;

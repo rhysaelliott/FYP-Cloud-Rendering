@@ -360,6 +360,13 @@ void VulkanEngine::init_descriptors()
         _gpuLightDataDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
+    {
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        _billboardPositionsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT);
+    }
+ 
+
 
     {
         DescriptorLayoutBuilder builder;
@@ -375,7 +382,7 @@ void VulkanEngine::init_descriptors()
             vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
-            vkDestroyDescriptorSetLayout(_device, _billboardDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _billboardPositionsDescriptorLayout, nullptr);
         });
 }
 
@@ -649,18 +656,17 @@ void VulkanEngine::init_billboard_pipeline()
 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex
-    layoutBuilder.add_binding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); //billboard pos data
 
-    _billboardDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT| VK_SHADER_STAGE_FRAGMENT_BIT);
+    _billboardMaterialDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _billboardDescriptorLayout};
+    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _billboardMaterialDescriptorLayout, _billboardPositionsDescriptorLayout};
 
     //todo change this stuff
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
     pipeline_layout_info.pPushConstantRanges = &bufferRange;
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pSetLayouts = layouts;
-    pipeline_layout_info.setLayoutCount = 2;
+    pipeline_layout_info.setLayoutCount = 3;
     
 
     VkPipelineLayout pipelineLayout;
@@ -694,7 +700,7 @@ void VulkanEngine::init_billboard_pipeline()
 
     _mainDeletionQueue.push_function([&]()
         {
-            vkDestroyDescriptorSetLayout(_device, _billboardDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _billboardMaterialDescriptorLayout, nullptr);
             vkDestroyPipelineLayout(_device, _billboardPipeline.layout, nullptr);
             vkDestroyPipeline(_device, _billboardPipeline.pipeline, nullptr);
         });
@@ -1375,16 +1381,14 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, lightDescriptor);
 
-    VkDescriptorSet billboardDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _billboardDescriptorLayout);
-
     //todo change this to be billboard stuff
     AllocatedBuffer gpuBillboardBuffer = create_buffer(sizeof(BillboardData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     BillboardData* billboardBufferData = (BillboardData*)gpuBillboardBuffer.allocation->GetMappedData();
     *billboardBufferData = _billboardData;
+    VkDescriptorSet billboardPosDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _billboardPositionsDescriptorLayout);
 
-    writer.write_buffer(4, gpuBillboardBuffer.buffer, sizeof(billboardBufferData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-
-    //writer.update_set(_device, billboardDescriptor);
+    writer.write_buffer(0, gpuBillboardBuffer.buffer, sizeof(_billboardData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, billboardPosDescriptor);
 
     //reset counters
     stats.drawcallCount = 0;
@@ -1434,18 +1438,23 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                 if (draw.material->passType == MaterialPass::Billboard)
                 {
-                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardDescriptorLayout);
+                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
 
                     DescriptorWriter writer;
+
                     writer.write_image(1, _errorCheckImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
+                    writer.update_set(_device, draw.material->materialSet);
                     //todo pass positions for instanced rendering through
+
+                    
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
                 
                 }
 
                 if (draw.material->passType != MaterialPass::Volumetric)
                 {
-
+                    
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
                     
                 }

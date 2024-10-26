@@ -189,7 +189,8 @@ public:
 
 	//billboards
 	MaterialPipeline _billboardPipeline;
-	VkDescriptorSetLayout _billboardDescriptorLayout;
+	VkDescriptorSetLayout _billboardMaterialDescriptorLayout;
+	VkDescriptorSetLayout _billboardPositionsDescriptorLayout;
 	MaterialInstance _billboardMaterial;
 	BillboardData _billboardData;
 
