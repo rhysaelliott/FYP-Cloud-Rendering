@@ -450,8 +450,8 @@ void VulkanEngine::init_background_pipelines()
     gradient.name = "gradient";
     gradient.data = {};
 
-    gradient.data.data1 = glm::vec4(1, 0, 0, 1);
-    gradient.data.data2 = glm::vec4(0, 0, 1, 1);
+    gradient.data.data1 = glm::vec4(0.53f, 0.81f, 0.98f, 1.0f);
+    gradient.data.data2 = glm::vec4(0.98f, 0.87f, 0.67f, 1.0f);
 
     VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient.pipeline));
 
