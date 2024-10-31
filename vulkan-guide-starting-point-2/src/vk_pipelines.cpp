@@ -96,6 +96,7 @@ void PipelineBuilder::enable_blending_additive()
 	_colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 }
 
+
 void PipelineBuilder::enable_blending_alphablend()
 {
 	_colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

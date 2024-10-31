@@ -628,7 +628,7 @@ void VulkanEngine::init_volumetric_pipeline()
 
 void VulkanEngine::init_billboard_pipeline()
 {
-    //todo 
+   
     VkShaderModule billboardFragShader;
     if (!vkutil::load_shader_module("../../shaders/billboard.frag.spv", _device, &billboardFragShader))
     {
@@ -655,7 +655,15 @@ void VulkanEngine::init_billboard_pipeline()
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex
+    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex1
+    layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex2
+    layoutBuilder.add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex3
+    layoutBuilder.add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex4
+    layoutBuilder.add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex5
+    layoutBuilder.add_binding(6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex6
+    layoutBuilder.add_binding(7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex7
+    layoutBuilder.add_binding(8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex8
+    layoutBuilder.add_binding(9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex9
 
     _billboardMaterialDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -682,7 +690,7 @@ void VulkanEngine::init_billboard_pipeline()
     pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipelineBuilder.set_multisampling_none();
-    pipelineBuilder.enable_blending_additive();
+    pipelineBuilder.enable_blending_alphablend();
 
     pipelineBuilder.enable_depthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
@@ -715,27 +723,7 @@ void VulkanEngine::init_default_data()
     uint32_t grey = glm::packUnorm4x8(glm::vec4(.66f, .66f, .66f, 1));
     _greyImage = create_image((void*)&grey, VkExtent3D{ 1,1,1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    
-
-    //load textures
-    const std::string path("..\\..\\assets\\cloud1.png");
-    int width, height, nrChannels;
-
-    unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
-    if (data)
-    {
-        VkExtent3D imageSize;
-        imageSize.width = width;
-        imageSize.height = height;
-        imageSize.depth = 1;
-
-        _cloudImage = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-
-        stbi_image_free(data);
-    }
-
     uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
-
     uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
     std::array<uint32_t, 16 * 16> pixels;
     for (int x = 0; x < 16; x++)
@@ -748,6 +736,34 @@ void VulkanEngine::init_default_data()
     _errorCheckImage = create_image(pixels.data(), VkExtent3D{ 16,16,1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
 
+    _cloudSamplers.resize(9, VK_NULL_HANDLE);
+    for (int i = 0; i < 9; i++)
+    {
+        //load textures
+        const std::string path("..\\..\\assets\\cloud"+ std::to_string(i+1) +".png");
+        int width, height, nrChannels;
+
+        unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+        if (data)
+        {
+            VkExtent3D imageSize;
+            imageSize.width = width;
+            imageSize.height = height;
+            imageSize.depth = 1;
+
+            _cloudImages.push_back(create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT,true));
+
+            stbi_image_free(data);
+
+            VkSamplerCreateInfo samplerInfo = {};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+            vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudSamplers[i]);
+        }
+    }
+
 
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -759,6 +775,7 @@ void VulkanEngine::init_default_data()
 
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
+    
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_defaultSamplerLinear);
 
@@ -768,9 +785,13 @@ void VulkanEngine::init_default_data()
 
         destroy_image(_whiteImage);
         destroy_image(_greyImage);
-        destroy_image(_cloudImage);
         destroy_image(_errorCheckImage);
 
+        for (int i = _cloudImages.size(); i--;)
+        {
+            destroy_image(_cloudImages[i]);
+            vkDestroySampler(_device, _cloudSamplers[i], nullptr);
+        }
         });
     mainCamera.velocity = glm::vec3(0.f);
     mainCamera.position = glm::vec3(30.f, -0.f, -85.f);
@@ -895,13 +916,13 @@ void VulkanEngine::init_billboard_data()
     mainDrawContext.BillboardSurfaces.push_back(obj);
 
 
-
-
     for (int i = 0; i <= obj.instanceCount; i++)
     {
-        _billboardData.billboardPos[i] =glm::vec4(i,0,0,0);
+        _billboardData.billboardPos[i] =glm::vec4(rand()%(101), rand() % (101), rand() % (101), 0);
 
-        _billboardData.scale[i] = i;
+        _billboardData.scale[i] = rand() % (10-1+1)+1;
+
+        _billboardData.texIndex[i] = rand() % (9);
     }
 
     _mainDeletionQueue.push_function([&]() {
@@ -1209,9 +1230,11 @@ void VulkanEngine::update_scene()
     sceneData.proj[1][1] *= -1;
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
-    sceneData.ambientColor = glm::vec4(.1f);
-    sceneData.sunlightColor = glm::vec4(1.f);
-    sceneData.sunlightDirection = glm::vec4(0,1,0.5,1.f);
+    sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
+
+    sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
+
+    sceneData.sunlightDirection = glm::vec4(0.5f, -0.5f, 0.5f, 1.0f);
 
     update_volumetrics();
     update_billboards();
@@ -1464,8 +1487,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
 
                     DescriptorWriter writer;
-
-                    writer.write_image(1, _cloudImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    for (int i = _cloudImages.size(); i--;)
+                    {
+                        writer.write_image(i+1, _cloudImages[i].imageView, _cloudSamplers[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    }
 
                     writer.update_set(_device, draw.material->materialSet);
 

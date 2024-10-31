@@ -8,6 +8,7 @@ layout(location =0) out vec3 outNormal;
 layout(location =1) out vec3 outColor;
 layout(location = 2) out vec2 outUV;
 layout(location = 3) out vec3 outPos;
+layout(location =4) out flat int outInstanceIndex;
 
 struct Vertex
 {
@@ -29,12 +30,7 @@ layout(push_constant) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
-layout(set=2, binding= 0) uniform BillboardData
-{
-	vec4 position[128];
-    float scale[128];    
 
-} billboardData;
 
 
 void main()
@@ -49,8 +45,8 @@ void main()
     translationMatrix[2][2]=1.0;
     translationMatrix[3] = vec4(billboardData.position[gl_InstanceIndex].xyz, 1.0);
     mat4 scaleMatrix = mat4(0.0);
-    scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex]/100.0;
-    scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex]/100.0;
+    scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex];
+    scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex];
     scaleMatrix[2][2] =1.0;
     scaleMatrix[3][3]=1.0;
 
@@ -78,7 +74,7 @@ void main()
 
     outNormal = (PushConstants.render_matrix * vec4(v.normal, 0.0)).xyz;
     outColor = v.color.xyz;
-
+    outInstanceIndex = gl_InstanceIndex;
 
     outUV.x = v.uv_x;
     outUV.y = v.uv_y;

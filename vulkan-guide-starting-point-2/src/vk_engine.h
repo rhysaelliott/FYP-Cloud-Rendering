@@ -51,6 +51,7 @@ struct BillboardData
 {
 	glm::vec4 billboardPos[128];
 	float scale[128];
+	int texIndex[128];
 };
 
 
@@ -146,7 +147,8 @@ public:
 
 	//temporary textures
 	AllocatedImage _whiteImage;
-	AllocatedImage _cloudImage;
+	std::vector<AllocatedImage> _cloudImages;
+	std::vector<VkSampler> _cloudSamplers;
 	AllocatedImage _greyImage;
 	AllocatedImage _errorCheckImage;
 
