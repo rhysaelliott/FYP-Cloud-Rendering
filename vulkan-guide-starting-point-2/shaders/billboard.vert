@@ -32,6 +32,7 @@ layout(push_constant) uniform constants
 layout(set=2, binding= 0) uniform BillboardData
 {
 	vec4 position[128];
+    float scale[128];    
 
 } billboardData;
 
@@ -42,8 +43,17 @@ void main()
     
     vec4 vertexPosition = vec4(v.position, 1.0);
 
-    mat4 translationMatrix = mat4(1.0);
+    mat4 translationMatrix = mat4(0.0);
+    translationMatrix[0][0]=1.0;
+    translationMatrix[1][1]=1.0;
+    translationMatrix[2][2]=1.0;
     translationMatrix[3] = vec4(billboardData.position[gl_InstanceIndex].xyz, 1.0);
+    mat4 scaleMatrix = mat4(0.0);
+    scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex]/100.0;
+    scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex]/100.0;
+    scaleMatrix[2][2] =1.0;
+    scaleMatrix[3][3]=1.0;
+
 
 
     vec3 cameraPosition = inverse(sceneData.view)[3].xyz;
@@ -61,7 +71,7 @@ void main()
         vec4(0.0, 0.0, 0.0, 1.0)
     );
 
-    mat4 modelView = sceneData.view * (translationMatrix * rotationMatrix * PushConstants.render_matrix);
+    mat4 modelView = sceneData.view * (translationMatrix* rotationMatrix *scaleMatrix*PushConstants.render_matrix);
 
     gl_Position = sceneData.proj * modelView * vertexPosition;
     outPos = (modelView * vertexPosition).xyz;

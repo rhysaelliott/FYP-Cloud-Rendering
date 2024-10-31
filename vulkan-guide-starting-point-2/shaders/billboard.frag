@@ -26,8 +26,11 @@ void main()
 
 	vec3 base = texture(colorTex, inUV).xyz;
 	//base = inColor;
+	vec3 finalColor = base * sceneData.sunlightColor.xyz;
 
-
-
-	outFragColor =vec4(base, 1.0f);
+	if(base == vec3(1,1,1))
+	{
+		discard;
+	}
+	outFragColor =vec4(finalColor, 1.0f);
 }

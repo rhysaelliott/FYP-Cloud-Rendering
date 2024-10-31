@@ -50,6 +50,7 @@ struct VolumetricData
 struct BillboardData
 {
 	glm::vec4 billboardPos[128];
+	float scale[128];
 };
 
 
@@ -145,7 +146,7 @@ public:
 
 	//temporary textures
 	AllocatedImage _whiteImage;
-	AllocatedImage _blackImage;
+	AllocatedImage _cloudImage;
 	AllocatedImage _greyImage;
 	AllocatedImage _errorCheckImage;
 

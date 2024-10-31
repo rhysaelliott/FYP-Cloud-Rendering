@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <SDL_vulkan.h>
 #include <glm/gtx/transform.hpp>
+#include "stb_image.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -625,7 +626,6 @@ void VulkanEngine::init_volumetric_pipeline()
         });
 }
 
-//todo add texture support
 void VulkanEngine::init_billboard_pipeline()
 {
     //todo 
@@ -682,10 +682,9 @@ void VulkanEngine::init_billboard_pipeline()
     pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipelineBuilder.set_multisampling_none();
-    //pipelineBuilder.disable_blending();
-    pipelineBuilder.enable_blending_alphablend();
-    //pipelineBuilder.disable_depthtest();
-    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipelineBuilder.enable_blending_additive();
+
+    pipelineBuilder.enable_depthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
@@ -716,8 +715,26 @@ void VulkanEngine::init_default_data()
     uint32_t grey = glm::packUnorm4x8(glm::vec4(.66f, .66f, .66f, 1));
     _greyImage = create_image((void*)&grey, VkExtent3D{ 1,1,1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
+    
+
+    //load textures
+    const std::string path("..\\..\\assets\\cloud1.png");
+    int width, height, nrChannels;
+
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+    if (data)
+    {
+        VkExtent3D imageSize;
+        imageSize.width = width;
+        imageSize.height = height;
+        imageSize.depth = 1;
+
+        _cloudImage = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+        stbi_image_free(data);
+    }
+
     uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
-    _blackImage = create_image((void*)&black, VkExtent3D{ 1,1,1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
     std::array<uint32_t, 16 * 16> pixels;
@@ -729,6 +746,8 @@ void VulkanEngine::init_default_data()
         }
     }
     _errorCheckImage = create_image(pixels.data(), VkExtent3D{ 16,16,1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+
 
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -749,7 +768,7 @@ void VulkanEngine::init_default_data()
 
         destroy_image(_whiteImage);
         destroy_image(_greyImage);
-        destroy_image(_blackImage);
+        destroy_image(_cloudImage);
         destroy_image(_errorCheckImage);
 
         });
@@ -868,8 +887,6 @@ void VulkanEngine::init_billboard_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_billboardMaterial;
-    //todo transform
-    //def.transform = nodeMatrix;
     obj.transform = glm::mat4{ 1.f };
 
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
@@ -877,13 +894,18 @@ void VulkanEngine::init_billboard_data()
 
     mainDrawContext.BillboardSurfaces.push_back(obj);
 
+
+
+
     for (int i = 0; i <= obj.instanceCount; i++)
     {
-        _billboardData.billboardPos[i] =glm::vec4(glm::vec3(i),0);
+        _billboardData.billboardPos[i] =glm::vec4(i,0,0,0);
+
+        _billboardData.scale[i] = i;
     }
 
     _mainDeletionQueue.push_function([&]() {
-
+        
         });
 }
 
@@ -1155,7 +1177,7 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
             if (mipmapped)
             {
 
-                vkutil::generate_mipmaps(cmd, newImage.image, VkExtent2D{ newImage.imageExtent.height, newImage.imageExtent.width });
+                vkutil::generate_mipmaps(cmd, newImage.image, VkExtent2D{ newImage.imageExtent.width, newImage.imageExtent.height });
             }
             else
             {
@@ -1443,10 +1465,9 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                     DescriptorWriter writer;
 
-                    writer.write_image(1, _errorCheckImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.write_image(1, _cloudImage.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
                     writer.update_set(_device, draw.material->materialSet);
-                    //todo pass positions for instanced rendering through
 
                     
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
