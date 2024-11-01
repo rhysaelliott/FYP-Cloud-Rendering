@@ -47,11 +47,17 @@ struct VolumetricData
 	float test;
 };
 
+struct CloudInstance
+{
+	float distance;
+	int index;
+};
+
 struct BillboardData
 {
 	glm::vec4 billboardPos[128];
-	float scale[128];
-	int texIndex[128];
+	glm::vec4 scale[32];
+	glm::vec4 texIndex[32];
 };
 
 

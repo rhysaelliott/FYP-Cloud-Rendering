@@ -23,43 +23,51 @@ float saturate(in float num)
 void main()
 {
 	vec4 base;
-	switch(inInstanceIndex)
-	{
-	case 0:
+	float b = billboardData.texIndex[inInstanceIndex/4][inInstanceIndex%4];
+if(b == 0)
+{
 		base = texture(colorTex,inUV);
-	break;
-	case 1:
+}
+else if(b==1)
+{
 		base = texture(metalRoughTex,inUV);
-	break; 
-		case 2:
+}
+else if(b==2)
+{
 		base = texture(cloudTex3,inUV);
-	break; 
-		case 3:
+}
+else if(b==3)
+{
 		base = texture(cloudTex4,inUV);
-	break; 
-		case 4:
+}
+else if(b==4)
+{
+
 		base = texture(cloudTex5,inUV);
-	break; 
-	case 5:
+}
+else if(b==5)
+{
+
 		base = texture(cloudTex6,inUV);
-	break; 
-		case 6:
+}
+else if(b==6)
+{
 		base = texture(cloudTex7,inUV);
-	break; 
-		case 7:
+}
+else if(b==7)
+{
 		base = texture(cloudTex8,inUV);
-	break; 
-		case 8:
+}else if(b==8)
+{
+
 		base = texture(cloudTex9,inUV);
-	break; 
-	default:
-	base = texture(metalRoughTex, inUV);
-	break;
-	}
-vec4 threshold = vec4(0.1);
- if((base.r < threshold.x && base.g < threshold.y && base.b < threshold.z) || base.a < threshold.w) {
-     discard;
- }
+}else 
+{
+		base = texture(metalRoughTex,inUV);
+}
+
+//base = texture(cloudTex7,inUV);
+
 
 	float lightValue = max(dot(inNormal, sceneData.sunlightDirection.xyz), 0.1f);
 	lightValue = mix(0.1f, lightValue, lightValue);
@@ -72,5 +80,5 @@ vec4 threshold = vec4(0.1);
 
 
 
-	outFragColor =vec4(color, base.a);
+	outFragColor =vec4(color+(lightValue*sceneData.sunlightColor.xyz)+ambient + rimColor, base.a);
 }

@@ -45,8 +45,8 @@ void main()
     translationMatrix[2][2]=1.0;
     translationMatrix[3] = vec4(billboardData.position[gl_InstanceIndex].xyz, 1.0);
     mat4 scaleMatrix = mat4(0.0);
-    scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex];
-    scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex];
+    scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4];
+    scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4];
     scaleMatrix[2][2] =1.0;
     scaleMatrix[3][3]=1.0;
 

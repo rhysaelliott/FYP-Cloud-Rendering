@@ -76,6 +76,7 @@ void PipelineBuilder::set_multisampling_none()
 	_multisampling.alphaToCoverageEnable = VK_FALSE;
 	_multisampling.alphaToOneEnable = VK_FALSE;
 }
+
 void PipelineBuilder::disable_blending()
 {
 	_colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

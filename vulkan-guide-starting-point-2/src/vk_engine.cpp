@@ -13,6 +13,7 @@
 #include <vk_initializers.h>
 #include <vk_types.h>
 #include <vk_images.h>
+#include<map>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -364,7 +365,7 @@ void VulkanEngine::init_descriptors()
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        _billboardPositionsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT);
+        _billboardPositionsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
  
 
@@ -652,7 +653,7 @@ void VulkanEngine::init_billboard_pipeline()
     VkPushConstantRange bufferRange{};
     bufferRange.offset = 0;
     bufferRange.size = sizeof(GPUDrawPushConstants);
-    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT ;
 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); //cloud tex1
@@ -920,9 +921,9 @@ void VulkanEngine::init_billboard_data()
     {
         _billboardData.billboardPos[i] =glm::vec4(rand()%(101), rand() % (101), rand() % (101), 0);
 
-        _billboardData.scale[i] = rand() % (10-1+1)+1;
+        _billboardData.scale[i/4][i%4] = rand() % (10 - 5 + 1) + 5;
 
-        _billboardData.texIndex[i] = rand() % (9);
+        _billboardData.texIndex[i/4][i%4] = rand() % (9);
     }
 
     _mainDeletionQueue.push_function([&]() {
@@ -1372,7 +1373,6 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
-    //todo volumetric culling
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
@@ -1397,6 +1397,31 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                 return A.material < B.material;
             }
             });
+
+    //todo billboard sorting 
+    
+    //sort objects in terms of distance
+
+    BillboardData sortedBillboardData;
+    std::vector<CloudInstance> cloudInstances;
+
+    for (int i = 0; i < 128; i++)
+    {
+        float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
+        cloudInstances.push_back({distance,i});
+    }
+     
+    std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
+        return a.distance > b.distance;
+        });
+    for (int i = 0; i < 128; i++)
+    {
+        int sortedIndex = cloudInstances[i].index;
+
+        sortedBillboardData.billboardPos[i] = _billboardData.billboardPos[sortedIndex];
+        sortedBillboardData.scale[i/4][i%4] = _billboardData.scale[sortedIndex/4][sortedIndex%4];
+        sortedBillboardData.texIndex[i/4][i%4] = _billboardData.texIndex[sortedIndex / 4][sortedIndex % 4];
+    }
 
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1430,7 +1455,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     //todo change this to be billboard stuff
     AllocatedBuffer gpuBillboardBuffer = create_buffer(sizeof(BillboardData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     BillboardData* billboardBufferData = (BillboardData*)gpuBillboardBuffer.allocation->GetMappedData();
-    *billboardBufferData = _billboardData;
+    *billboardBufferData = sortedBillboardData;
     VkDescriptorSet billboardPosDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _billboardPositionsDescriptorLayout);
 
     writer.write_buffer(0, gpuBillboardBuffer.buffer, sizeof(_billboardData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -1556,7 +1581,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     for (auto r : opaqueDraws)
     {
-          //draw(mainDrawContext.OpaqueSurfaces[r]);
+         // draw(mainDrawContext.OpaqueSurfaces[r]);
     }
     for (auto r : mainDrawContext.TransparentSurfaces)
     {

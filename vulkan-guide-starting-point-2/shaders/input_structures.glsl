@@ -43,8 +43,8 @@ struct LightStruct
 layout(set=2, binding= 0) uniform BillboardData
 {
 	vec4 position[128];
-    float scale[128];   
-    int texIndex[128]; 
+    vec4 scale[32];   
+    vec4 texIndex[32]; 
 
 } billboardData;
 
