@@ -31,7 +31,10 @@ layout(push_constant) uniform constants
 } PushConstants;
 
 
-
+float saturate(in float num)
+{
+	return clamp(num, 0.0,1.0);
+}
 
 void main()
 {
@@ -39,16 +42,11 @@ void main()
     
     vec4 vertexPosition = vec4(v.position, 1.0);
 
-    mat4 translationMatrix = mat4(0.0);
-    translationMatrix[0][0]=1.0;
-    translationMatrix[1][1]=1.0;
-    translationMatrix[2][2]=1.0;
+    mat4 translationMatrix = mat4(1.0);
     translationMatrix[3] = vec4(billboardData.position[gl_InstanceIndex].xyz, 1.0);
-    mat4 scaleMatrix = mat4(0.0);
+    mat4 scaleMatrix = mat4(1.0);
     scaleMatrix[0][0]=billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4];
     scaleMatrix[1][1]= billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4];
-    scaleMatrix[2][2] =1.0;
-    scaleMatrix[3][3]=1.0;
 
 
 
@@ -58,15 +56,22 @@ void main()
 
     vec3 upVector = vec3(0.0, 1.0, 0.0);
     vec3 rightVector = normalize(cross(upVector, cameraDirection));
+    vec3 correctedUp = cross(cameraDirection, rightVector);
 
+    
+	float distanceToCamera =length( - inverse(sceneData.view)[3].xyz);
+
+    float rotationDampening =0.3;
+    float rotationFactor=saturate(1.0-(billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4]/distanceToCamera));
+    float adjustedRotationFactor = rotationDampening* rotationFactor;
 
     mat4 rotationMatrix = mat4(
         vec4(rightVector, 0.0),
-        vec4(upVector, 0.0),
+        vec4(correctedUp, 0.0),
         vec4(-cameraDirection, 0.0),
         vec4(0.0, 0.0, 0.0, 1.0)
     );
-
+    rotationMatrix =  mat4(1.0) * (1.0 - adjustedRotationFactor) + rotationMatrix * adjustedRotationFactor;
     mat4 modelView = sceneData.view * (translationMatrix* rotationMatrix *scaleMatrix*PushConstants.render_matrix);
 
     gl_Position = sceneData.proj * modelView * vertexPosition;
