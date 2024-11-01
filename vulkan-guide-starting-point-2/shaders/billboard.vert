@@ -70,7 +70,7 @@ void main()
     mat4 modelView = sceneData.view * (translationMatrix* rotationMatrix *scaleMatrix*PushConstants.render_matrix);
 
     gl_Position = sceneData.proj * modelView * vertexPosition;
-    outPos = (modelView * vertexPosition).xyz;
+    outPos = (translationMatrix*rotationMatrix*scaleMatrix *vertexPosition).xyz;
 
     outNormal = (PushConstants.render_matrix * vec4(v.normal, 0.0)).xyz;
     outColor = v.color.xyz;

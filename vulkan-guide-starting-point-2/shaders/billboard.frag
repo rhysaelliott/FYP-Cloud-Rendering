@@ -23,50 +23,41 @@ float saturate(in float num)
 void main()
 {
 	vec4 base;
-	float b = billboardData.texIndex[inInstanceIndex/4][inInstanceIndex%4];
-if(b == 0)
-{
+	int b = int(billboardData.texIndex[inInstanceIndex/4][inInstanceIndex%4]);
+	switch(b)
+	{
+	case 0:
 		base = texture(colorTex,inUV);
-}
-else if(b==1)
-{
+	break;
+	case 1:
 		base = texture(metalRoughTex,inUV);
-}
-else if(b==2)
-{
+	break; 
+		case 2:
 		base = texture(cloudTex3,inUV);
-}
-else if(b==3)
-{
+	break; 
+		case 3:
 		base = texture(cloudTex4,inUV);
-}
-else if(b==4)
-{
-
+	break; 
+		case 4:
 		base = texture(cloudTex5,inUV);
-}
-else if(b==5)
-{
-
+	break; 
+	case 5:
 		base = texture(cloudTex6,inUV);
-}
-else if(b==6)
-{
+	break; 
+		case 6:
 		base = texture(cloudTex7,inUV);
-}
-else if(b==7)
-{
+	break; 
+		case 7:
 		base = texture(cloudTex8,inUV);
-}else if(b==8)
-{
-
+	break; 
+		case 8:
 		base = texture(cloudTex9,inUV);
-}else 
-{
-		base = texture(metalRoughTex,inUV);
-}
+	break; 
+	default:
+	base = texture(metalRoughTex, inUV);
+	break;
+	}
 
-//base = texture(cloudTex7,inUV);
 
 
 	float lightValue = max(dot(inNormal, sceneData.sunlightDirection.xyz), 0.1f);
@@ -78,7 +69,12 @@ else if(b==7)
 	float rim = pow(1.0-lightValue,3.0);
 	vec3 rimColor = sceneData.sunlightColor.xyz * rim * 0.2;
 
+	float distanceToCamera =length(inPos.xyz - inverse(sceneData.view)[3].xyz);
 
+	float fadeStart =40.0;
+	float fadeEnd = 1.0;
 
-	outFragColor =vec4(color+(lightValue*sceneData.sunlightColor.xyz)+ambient + rimColor, base.a);
+	float fadeFactor = saturate((distanceToCamera-fadeEnd)/(fadeStart-fadeEnd));
+
+	outFragColor =vec4(color+(lightValue*sceneData.sunlightColor.xyz)+ambient + rimColor, base.a*fadeFactor);
 }
