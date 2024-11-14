@@ -59,19 +59,13 @@ void main()
     vec3 correctedUp = cross(cameraDirection, rightVector);
 
     
-	float distanceToCamera =length( - inverse(sceneData.view)[3].xyz);
-
-    float rotationDampening =0.3;
-    float rotationFactor=saturate(1.0-(billboardData.scale[gl_InstanceIndex/4][gl_InstanceIndex%4]/distanceToCamera));
-    float adjustedRotationFactor = rotationDampening* rotationFactor;
-
     mat4 rotationMatrix = mat4(
         vec4(rightVector, 0.0),
         vec4(correctedUp, 0.0),
         vec4(-cameraDirection, 0.0),
         vec4(0.0, 0.0, 0.0, 1.0)
     );
-    rotationMatrix =  mat4(1.0) * (1.0 - adjustedRotationFactor) + rotationMatrix * adjustedRotationFactor;
+
     mat4 modelView = sceneData.view * (translationMatrix* rotationMatrix *scaleMatrix*PushConstants.render_matrix);
 
     gl_Position = sceneData.proj * modelView * vertexPosition;

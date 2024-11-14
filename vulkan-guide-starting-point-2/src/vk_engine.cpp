@@ -917,13 +917,13 @@ void VulkanEngine::init_billboard_data()
     mainDrawContext.BillboardSurfaces.push_back(obj);
 
 
-    for (int i = 0; i <= obj.instanceCount; i++)
+    for (int i = 0; i < obj.instanceCount; i++)
     {
         _billboardData.billboardPos[i] =glm::vec4(rand()%(101), rand() % (101), rand() % (101), 0);
 
-        _billboardData.scale[i/4][i%4] = rand() % (10 - 5 + 1) + 5;
+        _billboardData.scale[i/4][i%4] = 10.0f;
 
-        _billboardData.texIndex[i/4][i%4] = rand() % (9);
+        _billboardData.texIndex[i/4][i%4] = rand() % (10);
     }
 
     _mainDeletionQueue.push_function([&]() {

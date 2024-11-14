@@ -64,15 +64,15 @@ void main()
 	lightValue = mix(0.1f, lightValue, lightValue);
 
 	vec3 color = base.xyz;
-	vec3 ambient = color * sceneData.ambientColor.xyz * 0.5; //0.5 as stand in for density
+	vec3 ambient = color * sceneData.ambientColor.xyz * ((base.r+base.g+base.b)/3.0);
 
 	float rim = pow(1.0-lightValue,3.0);
 	vec3 rimColor = sceneData.sunlightColor.xyz * rim * 0.2;
 
 	float distanceToCamera =length(inPos.xyz - inverse(sceneData.view)[3].xyz);
 
-	float fadeStart =40.0;
-	float fadeEnd = 1.0;
+	float fadeStart =10.0 * billboardData.scale[inInstanceIndex/4][inInstanceIndex%4];
+	float fadeEnd = 5.0;
 
 	float fadeFactor = saturate((distanceToCamera-fadeEnd)/(fadeStart-fadeEnd));
 
