@@ -230,3 +230,9 @@ struct MeshNode : public Node {
 };
 
 
+struct VoxelGrid
+{
+	float* density;
+	size_t dimenstion = 128;
+	glm::vec3 bounds[2] = { glm::vec3(-30,-30,-30), glm::vec3(30,30,30) }; //world space bounds
+};

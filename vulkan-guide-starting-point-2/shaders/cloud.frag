@@ -22,12 +22,13 @@ float saturate(in float num)
 
 void main()
 {
-	vec3 backgroundColor = vec3(0.1,0.3,0.6);
+	vec3 backgroundColor = vec3(1.0,0.0,0.0);
 
 	float sigma_a =0.1; //absorbtion 
 	float distance =10;
 	float T = exp(-distance*sigma_a);
-	vec3 backgroundColorThroughVolume = T * backgroundColor + (1-T)*inColor;
+	vec3 volumeColor = vec3(0,0,1);
+	vec3 backgroundColorThroughVolume = T * backgroundColor + (1-T)*volumeColor;
 
 
 

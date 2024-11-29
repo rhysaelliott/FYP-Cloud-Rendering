@@ -1249,10 +1249,7 @@ void VulkanEngine::update_scene()
 void VulkanEngine::update_volumetrics()
 {
 
-    //todo figure out how to load vertices to the damn thing
-    //create mesh node
-    //mesh node has a mesh asset
-    //call draw on the mesh node
+    // todo 
 
 }
 
@@ -1302,7 +1299,11 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
+    draw_billboards(cmd);
+
     draw_geometry(cmd);
+
+    draw_volumetrics(cmd);
 
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -1396,32 +1397,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             {
                 return A.material < B.material;
             }
-            });
-
-    //todo billboard sorting 
-    
-    //sort objects in terms of distance
-
-    BillboardData sortedBillboardData;
-    std::vector<CloudInstance> cloudInstances;
-
-    for (int i = 0; i < 128; i++)
-    {
-        float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
-        cloudInstances.push_back({distance,i});
-    }
-     
-    std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
-        return a.distance > b.distance;
         });
-    for (int i = 0; i < 128; i++)
-    {
-        int sortedIndex = cloudInstances[i].index;
-
-        sortedBillboardData.billboardPos[i] = _billboardData.billboardPos[sortedIndex];
-        sortedBillboardData.scale[i/4][i%4] = _billboardData.scale[sortedIndex/4][sortedIndex%4];
-        sortedBillboardData.texIndex[i/4][i%4] = _billboardData.texIndex[sortedIndex / 4][sortedIndex % 4];
-    }
 
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1452,7 +1428,174 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, lightDescriptor);
 
-    //todo change this to be billboard stuff
+    //reset counters
+    stats.drawcallCount = 0;
+    stats.triangleCount = 0;
+
+    auto start = std::chrono::system_clock::now();
+
+    MaterialPipeline* lastPipeline = nullptr;
+    MaterialInstance* lastMaterial = nullptr;
+    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+    LightBuffer lastLightData{};
+
+    auto draw = [&](const RenderObject& draw)
+        {
+
+            if (draw.material != lastMaterial)
+            {
+                lastMaterial = draw.material;
+
+                if (draw.material->pipeline != lastPipeline)
+                {
+                    lastPipeline = draw.material->pipeline;
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+
+
+                    VkViewport viewport = {};
+                    viewport.x = 0;
+                    viewport.y = 0;
+                    viewport.width = _drawExtent.width;
+                    viewport.height = _drawExtent.height;
+                    viewport.minDepth = 0.f;
+                    viewport.maxDepth = 1.f;
+
+                    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+                    VkRect2D scissor = {};
+                    scissor.offset.x = 0;
+                    scissor.offset.y = 0;
+                    scissor.extent.width = _drawExtent.width;
+                    scissor.extent.height = _drawExtent.height;
+
+                    vkCmdSetScissor(cmd, 0, 1, &scissor);
+                }
+                if (draw.material->passType != MaterialPass::Volumetric)
+                {
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                }
+            }
+
+            if (draw.indexBuffer != lastIndexBuffer)
+            {
+                lastIndexBuffer = draw.indexBuffer;
+                vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            }
+
+
+            //handle light data
+            //todo sort light buffer
+            //todo clear light data
+            if (draw.material->passType != MaterialPass::Volumetric)
+            {
+                std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+                lightData.numLights = 0;
+
+                for (const auto& l : sceneLights)
+                {
+                    if (lightData.numLights < 10)
+                    {
+                        lightData.lights[lightData.numLights++] = l;
+                    }
+
+                }
+
+                *lightBufferData = lightData;
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
+            }
+
+
+
+
+            GPUDrawPushConstants pushConstants;
+            pushConstants.vertexBuffer = draw.vertexBufferAddress;
+            pushConstants.worldMatrix = draw.transform;
+            vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+
+            vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+
+            stats.drawcallCount++;
+            stats.triangleCount += draw.indexCount / 3;
+        };
+
+
+
+    for (auto r : opaqueDraws)
+    {
+        draw(mainDrawContext.OpaqueSurfaces[r]);
+    }
+    for (auto r : mainDrawContext.TransparentSurfaces)
+    {
+        draw(r);
+    }
+    for (auto r : mainDrawContext.VolumetricSurfaces)
+    {
+        draw(r);
+    }
+
+    get_current_frame()._deletionQueue.push_function([=, this]() {
+        destroy_buffer(gpuSceneDataBuffer);
+        destroy_buffer(gpuLightBuffer);
+        });
+
+
+    auto end = std::chrono::system_clock::now();
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    stats.meshDrawTime = elapsed.count() / 1000.f;
+
+
+    vkCmdEndRendering(cmd);
+}
+
+void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
+{
+
+    BillboardData sortedBillboardData;
+    std::vector<CloudInstance> cloudInstances;
+
+    for (int i = 0; i < 128; i++)
+    {
+        float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
+        cloudInstances.push_back({ distance,i });
+    }
+
+    std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
+        return a.distance > b.distance;
+        });
+    for (int i = 0; i < 128; i++)
+    {
+        int sortedIndex = cloudInstances[i].index;
+
+        sortedBillboardData.billboardPos[i] = _billboardData.billboardPos[sortedIndex];
+        sortedBillboardData.scale[i / 4][i % 4] = _billboardData.scale[sortedIndex / 4][sortedIndex % 4];
+        sortedBillboardData.texIndex[i / 4][i % 4] = _billboardData.texIndex[sortedIndex / 4][sortedIndex % 4];
+    }
+
+    VkRenderingAttachmentInfo colorAttachment =
+        vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment =
+        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+
+    VkRenderingInfo renderInfo =
+        vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    //handle scene data
+    AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+    *sceneUniformData = sceneData;
+
+    VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
+
+    DescriptorWriter writer;
+    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, globalDescriptor);
+
     AllocatedBuffer gpuBillboardBuffer = create_buffer(sizeof(BillboardData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     BillboardData* billboardBufferData = (BillboardData*)gpuBillboardBuffer.allocation->GetMappedData();
     *billboardBufferData = sortedBillboardData;
@@ -1485,7 +1628,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
 
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
-                    
+
 
                     VkViewport viewport = {};
                     viewport.x = 0;
@@ -1506,30 +1649,26 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
                 }
 
+                draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
 
-                if (draw.material->passType == MaterialPass::Billboard)
+                DescriptorWriter writer;
+                for (int i = _cloudImages.size(); i--;)
                 {
-                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
+                    writer.write_image(i + 1, _cloudImages[i].imageView, _cloudSamplers[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                }
 
-                    DescriptorWriter writer;
-                    for (int i = _cloudImages.size(); i--;)
-                    {
-                        writer.write_image(i+1, _cloudImages[i].imageView, _cloudSamplers[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-                    }
+                writer.update_set(_device, draw.material->materialSet);
 
-                    writer.update_set(_device, draw.material->materialSet);
 
-                    
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
+
+
+
+
+
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+
                 
-                }
-
-                if (draw.material->passType != MaterialPass::Volumetric)
-                {
-                    
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
-                    
-                }
             }
 
             if (draw.indexBuffer != lastIndexBuffer)
@@ -1539,59 +1678,16 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             }
 
 
-            //handle light data
-            //todo sort light buffer
-            //todo clear light data
-            if (draw.material->passType != MaterialPass::Volumetric)
-            {
-                if (draw.material->passType != MaterialPass::Billboard)
-                {
-                    std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
-                    lightData.numLights = 0;
-
-                    for (const auto& l : sceneLights)
-                    {
-                        if (lightData.numLights < 10)
-                        {
-                            lightData.lights[lightData.numLights++] = l;
-                        }
-
-                    }
-
-                    *lightBufferData = lightData;
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
-                }
-            }
-
-            
-
-
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;
             vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
             vkCmdDrawIndexed(cmd, draw.indexCount, draw.instanceCount, draw.firstIndex, 0, 0);
-
-            stats.drawcallCount++;
-            stats.triangleCount += (draw.indexCount * draw.instanceCount) / 3;
         };
 
 
 
-    for (auto r : opaqueDraws)
-    {
-         // draw(mainDrawContext.OpaqueSurfaces[r]);
-    }
-    for (auto r : mainDrawContext.TransparentSurfaces)
-    {
-        draw(r);
-    }
-    for (auto r : mainDrawContext.VolumetricSurfaces)
-    {
-        //todo add back later
-        //draw(r);
-    }
     for (auto r : mainDrawContext.BillboardSurfaces)
     {
         draw(r);
@@ -1600,17 +1696,16 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
         destroy_buffer(gpuBillboardBuffer);
-        destroy_buffer(gpuLightBuffer);
         });
 
 
-    auto end = std::chrono::system_clock::now();
-
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    stats.meshDrawTime = elapsed.count() / 1000.f;
-
 
     vkCmdEndRendering(cmd);
+}
+
+void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
+{
+    //todo send volumetrics to gpu
 }
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
