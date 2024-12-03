@@ -197,12 +197,15 @@ public:
 	MaterialInstance _volumetricMaterial;
 
 	//billboards
-	MaterialPipeline _billboardPipeline;
+	MaterialPipeline _billboardPipeline[2];
+	int _billboardTransparencyType;
 	VkDescriptorSetLayout _billboardMaterialDescriptorLayout;
 	VkDescriptorSetLayout _billboardPositionsDescriptorLayout;
 	MaterialInstance _billboardMaterial;
 	BillboardData _billboardData;
 
+	//volumetric stuff
+	VoxelGrid _cloudVoxels;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;

@@ -3,11 +3,11 @@
 #include "input_structures.glsl"
 #define PI 3.1415926
 
-layout (location =0) in vec3 inNormal;
-layout(location=1) in vec3 inColor;
-layout(location =2) in vec2 inUV;
-layout(location =3) in vec3 inPos;
-
+layout(set=3, binding=0) uniform VoxelGrid
+{
+	float density[128];
+	vec3 bounds[2];
+} cloudVoxels;
 
 layout(location=0) out vec4 outFragColor;
 
@@ -17,6 +17,12 @@ float saturate(in float num)
 	return clamp(num, 0.0,1.0);
 }
 
+float HenyeyGreenstein(float cos_angle, float g)
+{
+	float g2 = g*g;
+	float val = ((1.0-g2)/pow(1.0+g2-2.0*g*cos_angle,1.5))/4 * PI;
+	return val;
+}
 
 
 
@@ -33,5 +39,5 @@ void main()
 
 
 
-	outFragColor =vec4(backgroundColorThroughVolume , 1.0f);
+	outFragColor =vec4(backgroundColorThroughVolume , 0.0f);
 }

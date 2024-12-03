@@ -640,6 +640,16 @@ void VulkanEngine::init_billboard_pipeline()
         fmt::print("Billboard fragment shader successfully loaded \n");
     }
 
+    VkShaderModule billboardDitherFragShader;
+    if (!vkutil::load_shader_module("../../shaders/billboardDither.frag.spv", _device, &billboardDitherFragShader))
+    {
+        fmt::print("Error when building the billboard dither fragment shader module \n");
+    }
+    else
+    {
+        fmt::print("Billboard dither fragment shader successfully loaded \n");
+    }
+
     VkShaderModule billboardVertexShader;
     if (!vkutil::load_shader_module("../../shaders/billboard.vert.spv", _device, &billboardVertexShader))
     {
@@ -681,7 +691,8 @@ void VulkanEngine::init_billboard_pipeline()
     VkPipelineLayout pipelineLayout;
 
     VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &pipelineLayout));
-    _billboardPipeline.layout = pipelineLayout;
+    _billboardPipeline[0].layout = pipelineLayout;
+    _billboardPipeline[1].layout = pipelineLayout;
 
     PipelineBuilder pipelineBuilder;
 
@@ -693,24 +704,30 @@ void VulkanEngine::init_billboard_pipeline()
     pipelineBuilder.set_multisampling_none();
     pipelineBuilder.enable_blending_alphablend();
 
-    pipelineBuilder.enable_depthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
 
-    _billboardPipeline.pipeline = pipelineBuilder.build_pipeline(_device);
+    _billboardPipeline[0].pipeline = pipelineBuilder.build_pipeline(_device);
 
+    pipelineBuilder.set_shaders(billboardVertexShader, billboardDitherFragShader);
+    
+    _billboardPipeline[1].pipeline = pipelineBuilder.build_pipeline(_device);
 
 
 
     vkDestroyShaderModule(_device, billboardVertexShader, nullptr);
     vkDestroyShaderModule(_device, billboardFragShader, nullptr);
+    vkDestroyShaderModule(_device, billboardDitherFragShader, nullptr);
 
     _mainDeletionQueue.push_function([&]()
         {
             vkDestroyDescriptorSetLayout(_device, _billboardMaterialDescriptorLayout, nullptr);
-            vkDestroyPipelineLayout(_device, _billboardPipeline.layout, nullptr);
-            vkDestroyPipeline(_device, _billboardPipeline.pipeline, nullptr);
+            vkDestroyPipelineLayout(_device, _billboardPipeline[0].layout, nullptr);
+            vkDestroyPipeline(_device, _billboardPipeline[0].pipeline, nullptr);
+            //vkDestroyPipelineLayout(_device, _billboardPipeline[1].layout, nullptr);
+            vkDestroyPipeline(_device, _billboardPipeline[1].pipeline, nullptr);
         });
 }
 
@@ -824,33 +841,16 @@ void VulkanEngine::init_default_data()
 
 void VulkanEngine::init_volumetric_data()
 {
-    //todo create cube vertices 
-    std::array<Vertex, 8> vertices = {
-        // Front face
-        Vertex{{-1.0f, -1.0f,  1.0f}}, // 0: bottom-left front
-        Vertex{{ 1.0f, -1.0f,  1.0f}}, // 1: bottom-right front
-        Vertex{{ 1.0f,  1.0f,  1.0f}}, // 2: top-right front
-        Vertex{{-1.0f,  1.0f,  1.0f}}, // 3: top-left front
-        // Back face
-        Vertex{{-1.0f, -1.0f, -1.0f}}, // 4: bottom-left back
-        Vertex{{ 1.0f, -1.0f, -1.0f}}, // 5: bottom-right back
-        Vertex{{ 1.0f,  1.0f, -1.0f}}, // 6: top-right back
-        Vertex{{-1.0f,  1.0f, -1.0f}}  // 7: top-left back
+    std::array<Vertex, 4> vertices = {
+        Vertex{{-1.0f, -1.0f, 0.0f}}, // Bottom-left
+        Vertex{{ 1.0f, -1.0f, 0.0f}}, // Bottom-right
+        Vertex{{ 1.0f,  1.0f, 0.0f}}, // Top-right
+        Vertex{{-1.0f,  1.0f, 0.0f}}  // Top-left
     };
 
-    std::array<uint32_t, 36> indices = {
-        // Front face
-        0, 1, 2, 2, 3, 0,
-        // Back face
-        4, 5, 6, 6, 7, 4,
-        // Left face
-        4, 0, 3, 3, 7, 4,
-        // Right face
-        1, 5, 6, 6, 2, 1,
-        // Top face
-        3, 2, 6, 6, 7, 3,
-        // Bottom face
-        4, 5, 1, 1, 0, 4
+    std::array<uint32_t, 6> indices = {
+        0, 1, 2, // First triangle
+        2, 3, 0  // Second triangle
     };
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
@@ -898,9 +898,9 @@ void VulkanEngine::init_billboard_data()
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
     RenderObject obj;
-
+    _billboardTransparencyType=1;
     _billboardMaterial.passType = MaterialPass::Billboard;
-    _billboardMaterial.pipeline = &_billboardPipeline;
+    _billboardMaterial.pipeline = &_billboardPipeline[0];
     
 
 
@@ -1255,7 +1255,14 @@ void VulkanEngine::update_volumetrics()
 
 void VulkanEngine::update_billboards()
 {
-
+    if (_billboardTransparencyType == 0)
+    {
+        _billboardMaterial.pipeline = &_billboardPipeline[0];
+    }
+    else
+    {
+        _billboardMaterial.pipeline = &_billboardPipeline[1];
+    }
 }
 
 void VulkanEngine::draw()
@@ -1556,22 +1563,29 @@ void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
     BillboardData sortedBillboardData;
     std::vector<CloudInstance> cloudInstances;
 
-    for (int i = 0; i < 128; i++)
+    if (_billboardTransparencyType == 0)
     {
-        float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
-        cloudInstances.push_back({ distance,i });
+        for (int i = 0; i < 128; i++)
+        {
+            float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
+            cloudInstances.push_back({ distance,i });
+        }
+
+        std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
+            return a.distance > b.distance;
+            });
+        for (int i = 0; i < 128; i++)
+        {
+            int sortedIndex = cloudInstances[i].index;
+
+            sortedBillboardData.billboardPos[i] = _billboardData.billboardPos[sortedIndex];
+            sortedBillboardData.scale[i / 4][i % 4] = _billboardData.scale[sortedIndex / 4][sortedIndex % 4];
+            sortedBillboardData.texIndex[i / 4][i % 4] = _billboardData.texIndex[sortedIndex / 4][sortedIndex % 4];
+        }
     }
-
-    std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
-        return a.distance > b.distance;
-        });
-    for (int i = 0; i < 128; i++)
+    else
     {
-        int sortedIndex = cloudInstances[i].index;
-
-        sortedBillboardData.billboardPos[i] = _billboardData.billboardPos[sortedIndex];
-        sortedBillboardData.scale[i / 4][i % 4] = _billboardData.scale[sortedIndex / 4][sortedIndex % 4];
-        sortedBillboardData.texIndex[i / 4][i % 4] = _billboardData.texIndex[sortedIndex / 4][sortedIndex % 4];
+        sortedBillboardData = _billboardData;
     }
 
     VkRenderingAttachmentInfo colorAttachment =
@@ -1814,20 +1828,9 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
-                if (ImGui::BeginTabItem("background"))
+                if (ImGui::BeginTabItem("billboard"))
                 {
-                    ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
-
-                    ComputeEffect& selected = backgroundEffects[currentBackgroundEffect];
-
-                    ImGui::Text("Selected effect: ", selected.name);
-
-                    ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, backgroundEffects.size() - 1);
-
-                    ImGui::InputFloat4("data1", (float*)&selected.data.data1);
-                    ImGui::InputFloat4("data2", (float*)&selected.data.data2);
-                    ImGui::InputFloat4("data3", (float*)&selected.data.data3);
-                    ImGui::InputFloat4("data4", (float*)&selected.data.data4);
+                    ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("stats"))
