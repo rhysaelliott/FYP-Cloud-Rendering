@@ -889,7 +889,7 @@ void VulkanEngine::init_billboard_data()
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
     RenderObject obj;
-    _billboardTransparencyType=1;
+    _billboardTransparencyType=0;
     _billboardMaterial.passType = MaterialPass::Billboard;
     _billboardMaterial.pipeline = &_billboardPipeline[0];
     
@@ -1580,6 +1580,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
             stats.drawcallCount++;
             stats.triangleCount += draw.indexCount / 3;
+
         };
 
 
@@ -1682,10 +1683,12 @@ void VulkanEngine::run()
                     if (SDL_GetRelativeMouseMode() == SDL_TRUE)
                     {
                         SDL_SetRelativeMouseMode(SDL_FALSE);
+                        mainCamera.isActive = false;
                     }
                     else
                     {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
+                        mainCamera.isActive = true;
                     }
                 }
             }

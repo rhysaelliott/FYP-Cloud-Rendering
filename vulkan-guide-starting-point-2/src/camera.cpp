@@ -19,6 +19,7 @@ glm::mat4 Camera::getRotationMatrix()
 
 void Camera::processSDLEvent(SDL_Event& e)
 {
+	if (!isActive) return;
 	if (e.type == SDL_KEYDOWN)
 	{
 		if (e.key.keysym.sym == SDLK_w) { velocity.z = -1; }
@@ -47,6 +48,7 @@ void Camera::processSDLEvent(SDL_Event& e)
 
 void Camera::update()
 {
+	if (!isActive) return;
 	glm::mat4 cameraRotation = getRotationMatrix();
 	position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.1f, 0.f));
 

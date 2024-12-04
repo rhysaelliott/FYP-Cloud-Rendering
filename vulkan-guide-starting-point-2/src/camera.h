@@ -5,6 +5,8 @@
 class Camera {
 public:
 
+	bool isActive = true;
+
 	glm::vec3 velocity;
 	glm::vec3 position;
 
