@@ -549,7 +549,7 @@ void VulkanEngine::init_mesh_pipeline()
 
 void VulkanEngine::init_volumetric_pipeline()
 {
-    //todo 
+    
     VkShaderModule volumetricFragShader;
     if (!vkutil::load_shader_module("../../shaders/cloud.frag.spv", _device, &volumetricFragShader))
     {
@@ -576,14 +576,12 @@ void VulkanEngine::init_volumetric_pipeline()
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-    _volumetricDescriptorLayout = layoutBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    _volumetricDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _gpuLightDataDescriptorLayout };
+    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _volumetricDescriptorLayout };
 
-    //todo change this stuff
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
     pipeline_layout_info.pPushConstantRanges = &bufferRange;
     pipeline_layout_info.pushConstantRangeCount = 1;
@@ -603,18 +601,13 @@ void VulkanEngine::init_volumetric_pipeline()
     pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipelineBuilder.set_multisampling_none();
-    //pipelineBuilder.disable_blending();
     pipelineBuilder.enable_blending_alphablend();
-    //pipelineBuilder.disable_depthtest();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
 
     _volumetricPipeline.pipeline = pipelineBuilder.build_pipeline(_device);
- 
-
-
 
     vkDestroyShaderModule(_device, volumetricVertexShader, nullptr);
     vkDestroyShaderModule(_device, volumetricFragShader, nullptr);
@@ -704,7 +697,7 @@ void VulkanEngine::init_billboard_pipeline()
     pipelineBuilder.set_multisampling_none();
     pipelineBuilder.enable_blending_alphablend();
 
-    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipelineBuilder.enable_depthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
@@ -716,7 +709,6 @@ void VulkanEngine::init_billboard_pipeline()
     _billboardPipeline[1].pipeline = pipelineBuilder.build_pipeline(_device);
 
 
-
     vkDestroyShaderModule(_device, billboardVertexShader, nullptr);
     vkDestroyShaderModule(_device, billboardFragShader, nullptr);
     vkDestroyShaderModule(_device, billboardDitherFragShader, nullptr);
@@ -726,7 +718,6 @@ void VulkanEngine::init_billboard_pipeline()
             vkDestroyDescriptorSetLayout(_device, _billboardMaterialDescriptorLayout, nullptr);
             vkDestroyPipelineLayout(_device, _billboardPipeline[0].layout, nullptr);
             vkDestroyPipeline(_device, _billboardPipeline[0].pipeline, nullptr);
-            //vkDestroyPipelineLayout(_device, _billboardPipeline[1].layout, nullptr);
             vkDestroyPipeline(_device, _billboardPipeline[1].pipeline, nullptr);
         });
 }
@@ -1306,11 +1297,7 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    draw_billboards(cmd);
-
     draw_geometry(cmd);
-
-    draw_volumetrics(cmd);
 
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -1406,160 +1393,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
             }
         });
 
-    VkRenderingAttachmentInfo colorAttachment =
-        vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment =
-        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-
-    VkRenderingInfo renderInfo =
-        vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
-    vkCmdBeginRendering(cmd, &renderInfo);
-
-    //handle scene data
-    AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-    GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-    *sceneUniformData = sceneData;
-
-    VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
-
-    DescriptorWriter writer;
-    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.update_set(_device, globalDescriptor);
-
-    AllocatedBuffer gpuLightBuffer = create_buffer(sizeof(LightBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    LightBuffer* lightBufferData = (LightBuffer*)gpuLightBuffer.allocation->GetMappedData();
-
-    VkDescriptorSet lightDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuLightDataDescriptorLayout);
-    writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.update_set(_device, lightDescriptor);
-
-    //reset counters
-    stats.drawcallCount = 0;
-    stats.triangleCount = 0;
-
-    auto start = std::chrono::system_clock::now();
-
-    MaterialPipeline* lastPipeline = nullptr;
-    MaterialInstance* lastMaterial = nullptr;
-    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
-    LightBuffer lastLightData{};
-
-    auto draw = [&](const RenderObject& draw)
-        {
-
-            if (draw.material != lastMaterial)
-            {
-                lastMaterial = draw.material;
-
-                if (draw.material->pipeline != lastPipeline)
-                {
-                    lastPipeline = draw.material->pipeline;
-                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
-
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
-
-
-                    VkViewport viewport = {};
-                    viewport.x = 0;
-                    viewport.y = 0;
-                    viewport.width = _drawExtent.width;
-                    viewport.height = _drawExtent.height;
-                    viewport.minDepth = 0.f;
-                    viewport.maxDepth = 1.f;
-
-                    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-                    VkRect2D scissor = {};
-                    scissor.offset.x = 0;
-                    scissor.offset.y = 0;
-                    scissor.extent.width = _drawExtent.width;
-                    scissor.extent.height = _drawExtent.height;
-
-                    vkCmdSetScissor(cmd, 0, 1, &scissor);
-                }
-                if (draw.material->passType != MaterialPass::Volumetric)
-                {
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
-                }
-            }
-
-            if (draw.indexBuffer != lastIndexBuffer)
-            {
-                lastIndexBuffer = draw.indexBuffer;
-                vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-            }
-
-
-            //handle light data
-            //todo sort light buffer
-            //todo clear light data
-            if (draw.material->passType != MaterialPass::Volumetric)
-            {
-                std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
-                lightData.numLights = 0;
-
-                for (const auto& l : sceneLights)
-                {
-                    if (lightData.numLights < 10)
-                    {
-                        lightData.lights[lightData.numLights++] = l;
-                    }
-
-                }
-
-                *lightBufferData = lightData;
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
-            }
-
-
-
-
-            GPUDrawPushConstants pushConstants;
-            pushConstants.vertexBuffer = draw.vertexBufferAddress;
-            pushConstants.worldMatrix = draw.transform;
-            vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-
-            vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
-
-            stats.drawcallCount++;
-            stats.triangleCount += draw.indexCount / 3;
-        };
-
-
-
-    for (auto r : opaqueDraws)
-    {
-        draw(mainDrawContext.OpaqueSurfaces[r]);
-    }
-    for (auto r : mainDrawContext.TransparentSurfaces)
-    {
-        draw(r);
-    }
-    for (auto r : mainDrawContext.VolumetricSurfaces)
-    {
-        draw(r);
-    }
-
-    get_current_frame()._deletionQueue.push_function([=, this]() {
-        destroy_buffer(gpuSceneDataBuffer);
-        destroy_buffer(gpuLightBuffer);
-        });
-
-
-    auto end = std::chrono::system_clock::now();
-
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    stats.meshDrawTime = elapsed.count() / 1000.f;
-
-
-    vkCmdEndRendering(cmd);
-}
-
-void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
-{
-
     BillboardData sortedBillboardData;
     std::vector<CloudInstance> cloudInstances;
 
@@ -1609,6 +1442,13 @@ void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
     DescriptorWriter writer;
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, globalDescriptor);
+
+    AllocatedBuffer gpuLightBuffer = create_buffer(sizeof(LightBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    LightBuffer* lightBufferData = (LightBuffer*)gpuLightBuffer.allocation->GetMappedData();
+
+    VkDescriptorSet lightDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuLightDataDescriptorLayout);
+    writer.write_buffer(0, gpuLightBuffer.buffer, sizeof(lightData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, lightDescriptor);
 
     AllocatedBuffer gpuBillboardBuffer = create_buffer(sizeof(BillboardData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     BillboardData* billboardBufferData = (BillboardData*)gpuBillboardBuffer.allocation->GetMappedData();
@@ -1663,26 +1503,34 @@ void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
                 }
 
-                draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
-
-                DescriptorWriter writer;
-                for (int i = _cloudImages.size(); i--;)
+                if (draw.material->passType == MaterialPass::Billboard)
                 {
-                    writer.write_image(i + 1, _cloudImages[i].imageView, _cloudSamplers[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _billboardMaterialDescriptorLayout);
+
+                    DescriptorWriter writer;
+                    for (int i = _cloudImages.size(); i--;)
+                    {
+                        writer.write_image(i + 1, _cloudImages[i].imageView, _cloudSamplers[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    }
+
+                    writer.update_set(_device, draw.material->materialSet);
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
                 }
 
-                writer.update_set(_device, draw.material->materialSet);
 
+                if (draw.material->passType != MaterialPass::Volumetric && draw.material->passType != MaterialPass::Billboard)
+                {
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+                }
+                else if(draw.material->passType==MaterialPass::Volumetric && draw.material->passType != MaterialPass::Billboard)
+                {
+                    //todo send a 3d texture to gpu
+                    //vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, , 0, nullptr);
+                }
 
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
-
-
-
-
-
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
-
-                
             }
 
             if (draw.indexBuffer != lastIndexBuffer)
@@ -1692,34 +1540,81 @@ void VulkanEngine::draw_billboards(VkCommandBuffer cmd)
             }
 
 
+            //handle light data
+            //todo sort light buffer
+            //todo clear light data
+            if (draw.material->passType != MaterialPass::Volumetric && draw.material->passType != MaterialPass::Billboard)
+            {
+                std::fill(std::begin(lightData.lights), std::end(lightData.lights), LightStruct{});
+                lightData.numLights = 0;
+
+                for (const auto& l : sceneLights)
+                {
+                    if (lightData.numLights < 10)
+                    {
+                        lightData.lights[lightData.numLights++] = l;
+                    }
+
+                }
+
+                *lightBufferData = lightData;
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &lightDescriptor, 0, nullptr);
+            }
+
+
+
+
             GPUDrawPushConstants pushConstants;
             pushConstants.vertexBuffer = draw.vertexBufferAddress;
             pushConstants.worldMatrix = draw.transform;
             vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
-            vkCmdDrawIndexed(cmd, draw.indexCount, draw.instanceCount, draw.firstIndex, 0, 0);
+            if (draw.material->passType == MaterialPass::Billboard)
+            {
+                vkCmdDrawIndexed(cmd, draw.indexCount, 128, draw.firstIndex, 0, 0);
+            }
+            else
+            {
+                vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+            }
+
+            stats.drawcallCount++;
+            stats.triangleCount += draw.indexCount / 3;
         };
 
 
 
+    for (auto r : opaqueDraws)
+    {
+        draw(mainDrawContext.OpaqueSurfaces[r]);
+    }
+    for (auto r : mainDrawContext.TransparentSurfaces)
+    {
+        draw(r);
+    }
     for (auto r : mainDrawContext.BillboardSurfaces)
+    {
+        draw(r);
+    }
+    for (auto r : mainDrawContext.VolumetricSurfaces)
     {
         draw(r);
     }
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
+        destroy_buffer(gpuLightBuffer);
         destroy_buffer(gpuBillboardBuffer);
         });
 
 
+    auto end = std::chrono::system_clock::now();
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    stats.meshDrawTime = elapsed.count() / 1000.f;
+
 
     vkCmdEndRendering(cmd);
-}
-
-void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
-{
-    //todo send volumetrics to gpu
 }
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)

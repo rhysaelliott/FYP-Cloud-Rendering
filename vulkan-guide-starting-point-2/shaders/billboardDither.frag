@@ -83,7 +83,7 @@ void main()
 
 	float fadeFactor = saturate((distanceToCamera-fadeEnd)/(fadeStart-fadeEnd));
 
-	if(base.a * fadeFactor * ditherValue<0.12)discard;
+	if( pow( base.a,0.6) * fadeFactor<ditherValue)discard;
 
 	outFragColor =vec4(color+(lightValue*sceneData.sunlightColor.xyz)+ambient + rimColor, 1.0);
 }

@@ -231,10 +231,6 @@ public:
 
 	void draw_geometry(VkCommandBuffer cmd);
 
-	void draw_billboards(VkCommandBuffer cmd);
-
-	void draw_volumetrics(VkCommandBuffer cmd);
-
 	void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
