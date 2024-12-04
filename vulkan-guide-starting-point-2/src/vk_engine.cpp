@@ -576,7 +576,7 @@ void VulkanEngine::init_volumetric_pipeline()
     bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
     _volumetricDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -889,9 +889,16 @@ void VulkanEngine::init_volumetric_data()
     }
     _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+    vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudVoxelSampler);
 
     _mainDeletionQueue.push_function([&]() {
         destroy_image(_cloudVoxelImage);
+        vkDestroySampler(_device, _cloudVoxelSampler, nullptr);
         });
 }
 
@@ -1554,21 +1561,18 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     writer.update_set(_device, draw.material->materialSet);
 
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &billboardPosDescriptor, 0, nullptr);
-
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
                 }
 
 
-                if (draw.material->passType != MaterialPass::Volumetric && draw.material->passType != MaterialPass::Billboard)
-                {
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
-                }
-                else if(draw.material->passType==MaterialPass::Volumetric && draw.material->passType != MaterialPass::Billboard)
+                else if(draw.material->passType==MaterialPass::Volumetric)
                 {
                     //todo send a 3d texture to gpu
-                    //vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, , 0, nullptr);
+                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
+                    DescriptorWriter writer;
+                    writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.update_set(_device, draw.material->materialSet);
                 }
-
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
             }
 
             if (draw.indexBuffer != lastIndexBuffer)

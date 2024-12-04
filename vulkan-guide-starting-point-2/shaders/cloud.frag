@@ -3,13 +3,7 @@
 #include "input_structures.glsl"
 #define PI 3.1415926
 
-layout(set =1, binding =0) uniform sampler3D voxelBuffer;
-
-layout(set=3, binding=0) uniform VoxelGrid
-{
-	float density[128];
-	vec3 bounds[2];
-} cloudVoxels;
+layout(set =1, binding =10) uniform sampler3D voxelBuffer;
 
 layout(location =0) in vec3 inPos;
 
@@ -40,7 +34,7 @@ void main()
 	vec3 volumeColor = vec3(0,0,1);
 	vec3 backgroundColorThroughVolume = T * backgroundColor + (1-T)*volumeColor;
 
-
+	backgroundColor =vec3(texture(voxelBuffer, inPos));
 
 
 	outFragColor =vec4(backgroundColorThroughVolume , 1.0f);

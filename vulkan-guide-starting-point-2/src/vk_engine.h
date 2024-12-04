@@ -208,6 +208,7 @@ public:
 	//volumetric stuff
 	VoxelGrid _cloudVoxels;
 	AllocatedImage _cloudVoxelImage;
+	VkSampler _cloudVoxelSampler;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
