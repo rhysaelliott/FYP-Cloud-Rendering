@@ -3,11 +3,15 @@
 #include "input_structures.glsl"
 #define PI 3.1415926
 
+layout(set =1, binding =0) uniform sampler3D voxelBuffer;
+
 layout(set=3, binding=0) uniform VoxelGrid
 {
 	float density[128];
 	vec3 bounds[2];
 } cloudVoxels;
+
+layout(location =0) in vec3 inPos;
 
 layout(location=0) out vec4 outFragColor;
 
@@ -39,5 +43,5 @@ void main()
 
 
 
-	outFragColor =vec4(backgroundColorThroughVolume , 0.0f);
+	outFragColor =vec4(backgroundColorThroughVolume , 1.0f);
 }

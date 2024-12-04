@@ -8,6 +8,7 @@
 #include <vk_pipelines.h>
 #include <vk_loader.h>
 #include <camera.h>
+#include <Timer.h>
 
 
 struct GLTFMetallic_Roughness
@@ -206,6 +207,7 @@ public:
 
 	//volumetric stuff
 	VoxelGrid _cloudVoxels;
+	AllocatedImage _cloudVoxelImage;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;
@@ -214,6 +216,9 @@ public:
 	//background effect members
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
+
+	//timers
+	Timer* _renderTimeTimer;
 
 	//memory allocator
 	VmaAllocator _allocator;

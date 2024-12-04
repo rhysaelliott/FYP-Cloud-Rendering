@@ -828,20 +828,31 @@ void VulkanEngine::init_default_data()
 
     sceneLights.push_back(light1);
     sceneLights.push_back(light2);
+
+
+    _renderTimeTimer = new Timer("Render Time");
 }
 
 void VulkanEngine::init_volumetric_data()
 {
-    std::array<Vertex, 4> vertices = {
-        Vertex{{-1.0f, -1.0f, 0.0f}}, // Bottom-left
-        Vertex{{ 1.0f, -1.0f, 0.0f}}, // Bottom-right
-        Vertex{{ 1.0f,  1.0f, 0.0f}}, // Top-right
-        Vertex{{-1.0f,  1.0f, 0.0f}}  // Top-left
+    std::array<Vertex, 8> vertices = {
+        Vertex{{-1.0f, -1.0f, -1.0f}},
+        Vertex{{ 1.0f, -1.0f, -1.0f}},
+        Vertex{{ 1.0f,  1.0f, -1.0f}},
+        Vertex{{-1.0f,  1.0f, -1.0f}}, 
+        Vertex{{-1.0f, -1.0f,  1.0f}}, 
+        Vertex{{ 1.0f, -1.0f,  1.0f}}, 
+        Vertex{{ 1.0f,  1.0f,  1.0f}}, 
+        Vertex{{-1.0f,  1.0f,  1.0f}}  
     };
 
-    std::array<uint32_t, 6> indices = {
-        0, 1, 2, // First triangle
-        2, 3, 0  // Second triangle
+    std::array<uint32_t, 36> indices = {   
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+        0, 4, 7, 7, 3, 0,
+        1, 5, 6, 6, 2, 1,
+        0, 1, 5, 5, 4, 0,
+        3, 2, 6, 6, 7, 3
     };
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
@@ -849,23 +860,38 @@ void VulkanEngine::init_volumetric_data()
     
     _volumetricMaterial.passType = MaterialPass::Volumetric;
     _volumetricMaterial.pipeline = &_volumetricPipeline;
- //   _volumetricMaterial.materialSet = &_volumetricDescriptorLayout;
-    //todo work out the descriptor set
 
     obj.indexCount = indices.size();
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    //todo transform
-    //def.transform = nodeMatrix;
-    obj.transform = glm::mat4{ 1.f };
+    obj.transform = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 3.0f));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
     mainDrawContext.VolumetricSurfaces.push_back(obj);
 
-    _mainDeletionQueue.push_function([&]() {
 
+    //todo create 3d image for voxel data
+    for (int i = 128; i--;)
+    {
+        _cloudVoxels.density[i] = (float)(i / 128);
+    }
+    VkExtent3D imageSize;
+    imageSize.width = 32;
+    imageSize.height = 32;
+    imageSize.depth = 32;
+
+    std::vector<uint8_t> voxelData(128); 
+    for (size_t i = 0; i < voxelData.size(); i++) 
+    {
+        voxelData[i] = static_cast<uint8_t>(glm::clamp(_cloudVoxels.density[i], 0.0f, 1.0f) * 255.0f);
+    }
+    _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+
+    _mainDeletionQueue.push_function([&]() {
+        destroy_image(_cloudVoxelImage);
         });
 }
 
@@ -1156,6 +1182,11 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
     VkImageViewCreateInfo viewInfo = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
     viewInfo.subresourceRange.levelCount = imgInfo.mipLevels;
 
+    if (size.depth != 1)
+    {
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+    }
+
     VK_CHECK(vkCreateImageView(_device, &viewInfo, nullptr, &newImage.imageView));
 
     return newImage;
@@ -1163,7 +1194,15 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
 
 AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
 {
-    size_t dataSize = size.depth * size.width * size.height * 4;
+    size_t dataSize;
+    if (size.depth != 1)
+    {
+        dataSize = size.depth * size.width * size.height * 1;
+    }
+    else
+    {
+        dataSize = size.depth * size.width * size.height * 4;
+    }
     AllocatedBuffer uploadBuffer = create_buffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     memcpy(uploadBuffer.info.pMappedData, data, dataSize);
@@ -1276,7 +1315,6 @@ void VulkanEngine::draw()
         return;
     }
 
-
     VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
@@ -1298,7 +1336,6 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     draw_geometry(cmd);
-
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1368,6 +1405,8 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
+    _renderTimeTimer->Start();
+
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
@@ -1462,7 +1501,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     stats.drawcallCount = 0;
     stats.triangleCount = 0;
 
-    auto start = std::chrono::system_clock::now();
 
     MaterialPipeline* lastPipeline = nullptr;
     MaterialInstance* lastMaterial = nullptr;
@@ -1611,8 +1649,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     auto end = std::chrono::system_clock::now();
 
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    stats.meshDrawTime = elapsed.count() / 1000.f;
+    _renderTimeTimer->Stop();
+    stats.meshDrawTime = _renderTimeTimer->GetElapsed();
 
 
     vkCmdEndRendering(cmd);

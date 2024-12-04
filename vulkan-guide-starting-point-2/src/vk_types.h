@@ -232,6 +232,6 @@ struct MeshNode : public Node {
 
 struct VoxelGrid
 {
-	float density[128];
-	glm::vec3 bounds[2] = { glm::vec3(-30,-30,-30), glm::vec3(30,30,30) }; //world space bounds
+	float density[128]; //flattened 32*32*32 array 
 };
+
