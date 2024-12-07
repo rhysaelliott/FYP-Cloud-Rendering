@@ -5,6 +5,8 @@
 #include "input_structures.glsl"
 
 layout(location = 0) out vec3 outPos;
+layout (location =1) out vec3 rayOrigin;
+
 
 struct Vertex
 {
@@ -30,9 +32,10 @@ void main()
 {
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 	
-	vec4 position = vec4(v.position,1.0f);
-	gl_Position = sceneData.viewproj * PushConstants.render_matrix * position;
-	outPos= (PushConstants.render_matrix*position).xyz;
+	vec4 position = PushConstants.render_matrix * vec4(v.position,1.0f);
+	gl_Position = sceneData.viewproj * position;
+	outPos= position.xyz;
+	rayOrigin=  inverse(sceneData.view)[3].xyz;
 
 
 }

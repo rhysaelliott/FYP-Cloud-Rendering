@@ -872,20 +872,22 @@ void VulkanEngine::init_volumetric_data()
     mainDrawContext.VolumetricSurfaces.push_back(obj);
 
 
-    //todo create 3d image for voxel data
+    _cloudVoxels.centrePos = glm::vec3(obj.transform[3]);
+    _cloudVoxels.bounds = glm::vec3(2, 2, 2);
+    
     for (int i = 128; i--;)
     {
-        _cloudVoxels.density[i] = (float)(i / 128);
+        _cloudVoxels.density[i] = (float)(rand());
     }
     VkExtent3D imageSize;
     imageSize.width = 32;
     imageSize.height = 32;
     imageSize.depth = 32;
 
-    std::vector<uint8_t> voxelData(128); 
+    std::vector<char> voxelData(128); 
     for (size_t i = 0; i < voxelData.size(); i++) 
     {
-        voxelData[i] = static_cast<uint8_t>(glm::clamp(_cloudVoxels.density[i], 0.0f, 1.0f) * 255.0f);
+        voxelData[i] = static_cast<char>(glm::clamp(_cloudVoxels.density[i], 0.0f, 1.0f) * 255.0f);
     }
     _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
@@ -1566,7 +1568,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                 else if(draw.material->passType==MaterialPass::Volumetric)
                 {
-                    //todo send a 3d texture to gpu
                     draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
                     DescriptorWriter writer;
                     writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);

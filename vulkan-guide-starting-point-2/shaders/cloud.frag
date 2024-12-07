@@ -4,8 +4,17 @@
 #define PI 3.1415926
 
 layout(set =1, binding =10) uniform sampler3D voxelBuffer;
+layout(set=2, binding=1) uniform VoxelInfo
+{
+	vec3 centrePos;
+	vec3 bounds;
+} voxelInfo;
 
 layout(location =0) in vec3 inPos;
+layout (location =1) in vec3 rayOrigin;
+
+
+
 
 layout(location=0) out vec4 outFragColor;
 
@@ -22,20 +31,45 @@ float HenyeyGreenstein(float cos_angle, float g)
 	return val;
 }
 
-
-
 void main()
 {
-	vec3 backgroundColor = vec3(1.0,0.0,0.0);
+	float stepSize =0.1;
+	float tMin=0;
+	float tMax=100;
 
+	
+	vec3 voxelGridCentre = vec3(1,2,3);
+	vec3 voxelDimension = vec3(2);
+
+	vec3 voxelGridMin = voxelGridCentre - voxelDimension*0.5;
+		vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
+
+	vec3 rayDir = normalize(inPos -rayOrigin);
+
+	vec3 backgroundColor = vec3(0.53, 0.81, 0.98);
+
+	float accumulatedDensity =0.0;
+	float T =1.0;
 	float sigma_a =0.1; //absorbtion 
-	float distance =10;
-	float T = exp(-distance*sigma_a);
-	vec3 volumeColor = vec3(0,0,1);
-	vec3 backgroundColorThroughVolume = T * backgroundColor + (1-T)*volumeColor;
+	while(tMin<tMax &&accumulatedDensity<1.0)
+	{
+		vec3 samplePos = rayOrigin+ (rayDir*tMin); // worldspace
+		tMin+=stepSize;
+		if (!(samplePos.x >= voxelGridMin.x && samplePos.x <= voxelGridMax.x &&
+            samplePos.y >= voxelGridMin.y && samplePos.y <= voxelGridMax.y &&
+            samplePos.z >= voxelGridMin.z && samplePos.z <= voxelGridMax.z)) continue;
+        
+		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
+		float density =vec3(texture(voxelBuffer, (uvw))).r;
+		T *= exp(-stepSize * density*sigma_a);
+	}
 
-	backgroundColor =vec3(texture(voxelBuffer, inPos));
 
+	vec3 volumeColor = vec3(1.2,1.2,1.2);
+	vec3 backgroundColorThroughVolume =  T * backgroundColor + (1-T)*volumeColor;
 
-	outFragColor =vec4(backgroundColorThroughVolume , 1.0f);
+	//backgroundColorThroughVolume = vec3(accumulatedDensity);
+	
+
+	outFragColor =vec4(backgroundColorThroughVolume , 1.0);
 }

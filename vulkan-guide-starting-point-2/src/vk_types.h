@@ -233,5 +233,13 @@ struct MeshNode : public Node {
 struct VoxelGrid
 {
 	float density[128]; //flattened 32*32*32 array 
+	glm::vec3 centrePos;
+	glm::vec3 bounds;
+};
+
+struct GPUVoxelBuffer
+{
+	glm::vec3 centrePos;
+	glm::vec3 bounds;
 };
 
