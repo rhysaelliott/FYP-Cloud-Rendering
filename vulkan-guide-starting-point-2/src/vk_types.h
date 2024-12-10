@@ -229,17 +229,16 @@ struct MeshNode : public Node {
 	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
+struct GPUVoxelBuffer
+{
+	glm::vec4 centrePos;
+	glm::vec4 bounds;
+};
 
 struct VoxelGrid
 {
-	float density[128]; //flattened 32*32*32 array 
-	glm::vec3 centrePos;
-	glm::vec3 bounds;
+	float density[32768]; //flattened 32*32*32 array 
+	GPUVoxelBuffer GPUVoxelInfo;
 };
 
-struct GPUVoxelBuffer
-{
-	glm::vec3 centrePos;
-	glm::vec3 bounds;
-};
 

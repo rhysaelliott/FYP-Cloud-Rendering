@@ -195,6 +195,7 @@ public:
 	//volumetrics
 	MaterialPipeline _volumetricPipeline;
 	VkDescriptorSetLayout _volumetricDescriptorLayout;
+	VkDescriptorSetLayout _voxelBufferDescriptorLayout;
 	MaterialInstance _volumetricMaterial;
 
 	//billboards

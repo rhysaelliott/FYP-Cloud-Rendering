@@ -130,7 +130,7 @@ void VulkanEngine::init()
 
     assert(structureFile.has_value());
 
-    loadedScenes["structure"] = *structureFile;
+    //loadedScenes["structure"] = *structureFile;
 
     // everything went fine
     _isInitialized = true;
@@ -325,11 +325,6 @@ void VulkanEngine::init_descriptors()
 
 
 
-
-
-    //todo init the billboard set descriptor here 
-
-
     for (int i = 0; i < FRAME_OVERLAP; i++)
     {
         //create descriptor pool
@@ -367,6 +362,12 @@ void VulkanEngine::init_descriptors()
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         _billboardPositionsDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        _voxelBufferDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
  
 
 
@@ -385,6 +386,7 @@ void VulkanEngine::init_descriptors()
             vkDestroyDescriptorSetLayout(_device, _gpuLightDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _billboardPositionsDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _voxelBufferDescriptorLayout, nullptr);
         });
 }
 
@@ -580,13 +582,14 @@ void VulkanEngine::init_volumetric_pipeline()
 
     _volumetricDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _volumetricDescriptorLayout };
+
+    VkDescriptorSetLayout layouts[] = { _gpuSceneDataDescriptorLayout, _volumetricDescriptorLayout,_voxelBufferDescriptorLayout };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
     pipeline_layout_info.pPushConstantRanges = &bufferRange;
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pSetLayouts = layouts;
-    pipeline_layout_info.setLayoutCount = 2;
+    pipeline_layout_info.setLayoutCount = 3;
 
     VkPipelineLayout pipelineLayout;
 
@@ -865,17 +868,18 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 3.0f));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 3.0f));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(5, 5, 5));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
     mainDrawContext.VolumetricSurfaces.push_back(obj);
-
-
-    _cloudVoxels.centrePos = glm::vec3(obj.transform[3]);
-    _cloudVoxels.bounds = glm::vec3(2, 2, 2);
     
-    for (int i = 128; i--;)
+
+    _cloudVoxels.GPUVoxelInfo.centrePos = glm::vec4(glm::vec3(obj.transform[3]),0.f);
+    _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(glm::vec3(obj.transform[0].x*2.f, obj.transform[1].y * 2.f, obj.transform[2].z * 2.f), 0);
+    
+    for (int i = 32768; i--;)
     {
         _cloudVoxels.density[i] = (float)(rand());
     }
@@ -884,10 +888,10 @@ void VulkanEngine::init_volumetric_data()
     imageSize.height = 32;
     imageSize.depth = 32;
 
-    std::vector<char> voxelData(128); 
+    std::vector<char> voxelData(32768);
     for (size_t i = 0; i < voxelData.size(); i++) 
     {
-        voxelData[i] = static_cast<char>(glm::clamp(_cloudVoxels.density[i], 0.0f, 1.0f) * 255.0f);
+        voxelData[i] = static_cast<char>(_cloudVoxels.density[i]);
     }
     _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
@@ -1260,7 +1264,7 @@ void VulkanEngine::update_scene()
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
 
-    loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+   // loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -1505,7 +1509,16 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     writer.write_buffer(0, gpuBillboardBuffer.buffer, sizeof(_billboardData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     writer.update_set(_device, billboardPosDescriptor);
+    
 
+
+    AllocatedBuffer gpuVoxelBuffer = create_buffer(sizeof(GPUVoxelBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    GPUVoxelBuffer* voxelBufferData = (GPUVoxelBuffer*)gpuVoxelBuffer.allocation->GetMappedData();
+    *voxelBufferData = _cloudVoxels.GPUVoxelInfo;
+    VkDescriptorSet voxelBufferDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _voxelBufferDescriptorLayout);
+
+    writer.write_buffer(0, gpuVoxelBuffer.buffer, sizeof(_cloudVoxels.GPUVoxelInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, voxelBufferDescriptor);
     //reset counters
     stats.drawcallCount = 0;
     stats.triangleCount = 0;
@@ -1572,6 +1585,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     DescriptorWriter writer;
                     writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
                     writer.update_set(_device, draw.material->materialSet);
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &voxelBufferDescriptor, 0, nullptr);
                 }
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
             }
@@ -1632,6 +1646,10 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     {
         draw(mainDrawContext.OpaqueSurfaces[r]);
     }
+    for (auto r : mainDrawContext.VolumetricSurfaces)
+    {
+        draw(r);
+    }
     for (auto r : mainDrawContext.TransparentSurfaces)
     {
         draw(r);
@@ -1640,15 +1658,12 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     {
         draw(r);
     }
-    for (auto r : mainDrawContext.VolumetricSurfaces)
-    {
-        draw(r);
-    }
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuSceneDataBuffer);
         destroy_buffer(gpuLightBuffer);
         destroy_buffer(gpuBillboardBuffer);
+        destroy_buffer(gpuVoxelBuffer);
         });
 
 

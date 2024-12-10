@@ -4,10 +4,10 @@
 #define PI 3.1415926
 
 layout(set =1, binding =10) uniform sampler3D voxelBuffer;
-layout(set=2, binding=1) uniform VoxelInfo
+layout(set=2, binding=0) uniform VoxelInfo
 {
-	vec3 centrePos;
-	vec3 bounds;
+	vec4 centrePos;
+	vec4 bounds;
 } voxelInfo;
 
 layout(location =0) in vec3 inPos;
@@ -38,11 +38,11 @@ void main()
 	float tMax=100;
 
 	
-	vec3 voxelGridCentre = vec3(1,2,3);
-	vec3 voxelDimension = vec3(2);
+	vec3 voxelGridCentre = voxelInfo.centrePos.xyz;
+	vec3 voxelDimension = voxelInfo.bounds.xyz;
 
 	vec3 voxelGridMin = voxelGridCentre - voxelDimension*0.5;
-		vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
+	vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
 
 	vec3 rayDir = normalize(inPos -rayOrigin);
 
@@ -50,8 +50,9 @@ void main()
 
 	float accumulatedDensity =0.0;
 	float T =1.0;
-	float sigma_a =0.1; //absorbtion 
-	while(tMin<tMax &&accumulatedDensity<1.0)
+	float sigma_a =0.05; //absorbtion 
+	float sigma_s =0.05; //scattering
+	while(tMin<tMax && accumulatedDensity<1.0)
 	{
 		vec3 samplePos = rayOrigin+ (rayDir*tMin); // worldspace
 		tMin+=stepSize;
@@ -61,14 +62,16 @@ void main()
         
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
 		float density =vec3(texture(voxelBuffer, (uvw))).r;
-		T *= exp(-stepSize * density*sigma_a);
+		T *= exp(-stepSize * density*(sigma_a+sigma_s));
+
+		accumulatedDensity+=density;
 	}
 
 
-	vec3 volumeColor = vec3(1.2,1.2,1.2);
+	vec3 volumeColor = vec3(0.1,0.1,0.1);
 	vec3 backgroundColorThroughVolume =  T * backgroundColor + (1-T)*volumeColor;
 
-	//backgroundColorThroughVolume = vec3(accumulatedDensity);
+	backgroundColorThroughVolume = vec3(accumulatedDensity);
 	
 
 	outFragColor =vec4(backgroundColorThroughVolume , 1.0);
