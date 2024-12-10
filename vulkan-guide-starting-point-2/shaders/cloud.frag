@@ -9,13 +9,11 @@ layout(set=2, binding=0) uniform VoxelInfo
 {
 	vec4 centrePos;
 	vec4 bounds;
+	vec2 screenRes;
 } voxelInfo;
 
 layout(location =0) in vec3 inPos;
 layout (location =1) in vec3 rayOrigin;
-
-
-
 
 layout(location=0) out vec4 outFragColor;
 
@@ -46,8 +44,8 @@ void main()
 	vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
 
 	vec3 rayDir = normalize(inPos -rayOrigin);
-
-	vec3 backgroundColor = texture(backgroundTex,rayDir.xy).xyz;
+	vec2 backgroundUV = (gl_FragCoord).xy / voxelInfo.screenRes;
+	vec3 backgroundColor = texture(backgroundTex,backgroundUV).xyz;
 
 	float accumulatedDensity =0.0;
 	float T =1.0;
@@ -74,6 +72,6 @@ void main()
 
 	//backgroundColorThroughVolume = vec3(accumulatedDensity);
 	
-
+	
 	outFragColor =vec4(backgroundColorThroughVolume , 1.0);
 }

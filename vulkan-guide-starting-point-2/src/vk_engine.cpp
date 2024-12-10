@@ -1319,7 +1319,8 @@ void VulkanEngine::update_volumetrics()
 {
 
     // todo 
-
+    _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
+    _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 }
 
 void VulkanEngine::update_billboards()

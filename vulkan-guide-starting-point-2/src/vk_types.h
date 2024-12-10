@@ -233,6 +233,7 @@ struct GPUVoxelBuffer
 {
 	glm::vec4 centrePos;
 	glm::vec4 bounds;
+	glm::vec2 screenResolution;
 };
 
 struct VoxelGrid
