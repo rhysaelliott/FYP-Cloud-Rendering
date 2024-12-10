@@ -4,6 +4,7 @@
 #define PI 3.1415926
 
 layout(set =1, binding =10) uniform sampler3D voxelBuffer;
+layout(set =1, binding =11) uniform sampler2D backgroundTex;
 layout(set=2, binding=0) uniform VoxelInfo
 {
 	vec4 centrePos;
@@ -46,7 +47,7 @@ void main()
 
 	vec3 rayDir = normalize(inPos -rayOrigin);
 
-	vec3 backgroundColor = vec3(0.53, 0.81, 0.98);
+	vec3 backgroundColor = texture(backgroundTex,rayDir.xy).xyz;
 
 	float accumulatedDensity =0.0;
 	float T =1.0;
@@ -71,7 +72,7 @@ void main()
 	vec3 volumeColor = vec3(0.1,0.1,0.1);
 	vec3 backgroundColorThroughVolume =  T * backgroundColor + (1-T)*volumeColor;
 
-	backgroundColorThroughVolume = vec3(accumulatedDensity);
+	//backgroundColorThroughVolume = vec3(accumulatedDensity);
 	
 
 	outFragColor =vec4(backgroundColorThroughVolume , 1.0);

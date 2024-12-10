@@ -134,6 +134,7 @@ public:
 
 	//draw resources
 	AllocatedImage _drawImage;
+	AllocatedImage _backgroundImage;
 	AllocatedImage _depthImage;
 
 	VkExtent2D _drawExtent;
@@ -210,6 +211,7 @@ public:
 	VoxelGrid _cloudVoxels;
 	AllocatedImage _cloudVoxelImage;
 	VkSampler _cloudVoxelSampler;
+	VkSampler _backgroundSampler;
 
 	//triangle pipeline members
 	VkPipelineLayout _trianglePipelineLayout;

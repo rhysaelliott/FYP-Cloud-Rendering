@@ -217,6 +217,9 @@ void VulkanEngine::init_swapchain()
     _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     _drawImage.imageExtent = drawImageExtent;
 
+    _backgroundImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    _backgroundImage.imageExtent = drawImageExtent;
+
     VkImageUsageFlags drawImageUsages{};
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -240,6 +243,23 @@ void VulkanEngine::init_swapchain()
 
     VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &_drawImage.imageView));
 
+    //create background image
+    VkImageUsageFlags backgroundImageUsages{};
+    backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    backgroundImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    backgroundImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+
+
+
+    VkImageCreateInfo bimg_info =
+        vkinit::image_create_info(_backgroundImage.imageFormat, backgroundImageUsages, drawImageExtent);
+    vmaCreateImage(_allocator, &bimg_info, &rimg_allocInfo, &_backgroundImage.image, &_backgroundImage.allocation, nullptr);
+
+    VkImageViewCreateInfo bviewInfo =
+        vkinit::imageview_create_info(_backgroundImage.imageFormat, _backgroundImage.image, VK_IMAGE_VIEW_TYPE_2D);
+
+    VK_CHECK(vkCreateImageView(_device, &bviewInfo, nullptr, &_backgroundImage.imageView));
+
     //create depth image
     _depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
     _depthImage.imageExtent = drawImageExtent;
@@ -260,6 +280,9 @@ void VulkanEngine::init_swapchain()
         {
             vkDestroyImageView(_device, _drawImage.imageView, nullptr);
             vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
+
+            vkDestroyImageView(_device, _backgroundImage.imageView, nullptr);
+            vmaDestroyImage(_allocator, _backgroundImage.image, _backgroundImage.allocation);
 
             vkDestroyImageView(_device, _depthImage.imageView, nullptr);
             vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
@@ -318,7 +341,7 @@ void VulkanEngine::init_descriptors()
         _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
 
         DescriptorWriter writer;
-        writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.write_image(0, _backgroundImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
         writer.update_set(_device, _drawImageDescriptors);
     }
@@ -579,6 +602,7 @@ void VulkanEngine::init_volumetric_pipeline()
 
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
     _volumetricDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -901,10 +925,12 @@ void VulkanEngine::init_volumetric_data()
     samplerInfo.minFilter = VK_FILTER_LINEAR;
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudVoxelSampler);
+    vkCreateSampler(_device, &samplerInfo, nullptr, &_backgroundSampler);
 
     _mainDeletionQueue.push_function([&]() {
         destroy_image(_cloudVoxelImage);
         vkDestroySampler(_device, _cloudVoxelSampler, nullptr);
+        vkDestroySampler(_device, _backgroundSampler, nullptr);
         });
 }
 
@@ -1341,11 +1367,17 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background(cmd);
-
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    
+    vkutil::copy_image_to_image(cmd, _backgroundImage.image, _drawImage.image, _drawExtent, _drawExtent);
+    //todo transition background image  change background image usage bits
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     draw_geometry(cmd);
@@ -1584,6 +1616,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
                     draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
                     DescriptorWriter writer;
                     writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.write_image(11, _backgroundImage.imageView, _backgroundSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
                     writer.update_set(_device, draw.material->materialSet);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &voxelBufferDescriptor, 0, nullptr);
                 }
