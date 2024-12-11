@@ -32,9 +32,9 @@ float HenyeyGreenstein(float cos_angle, float g)
 
 void main()
 {
-	float stepSize =0.1;
+	float stepSize =1.0;
 	float tMin=0;
-	float tMax=100;
+	float tMax=1000;
 
 	
 	vec3 voxelGridCentre = voxelInfo.centrePos.xyz;
@@ -59,15 +59,19 @@ void main()
             samplePos.y >= voxelGridMin.y && samplePos.y <= voxelGridMax.y &&
             samplePos.z >= voxelGridMin.z && samplePos.z <= voxelGridMax.z)) continue;
         
+		//todo add some random jittering to this to avoid banding
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
 		float density =vec3(texture(voxelBuffer, (uvw))).r;
-		T *= exp(-stepSize * density*(sigma_a+sigma_s));
+		T *= exp(- density*(sigma_a+sigma_s));
 
 		accumulatedDensity+=density;
 	}
 
+	//todo raymarch to sun determine volume colour
 
-	vec3 volumeColor = vec3(0.1,0.1,0.1);
+
+
+	vec3 volumeColor = vec3(0.01,0.01,0.01) * sceneData.sunlightColor.xyz;
 	vec3 backgroundColorThroughVolume =  T * backgroundColor + (1-T)*volumeColor;
 
 	//backgroundColorThroughVolume = vec3(accumulatedDensity);

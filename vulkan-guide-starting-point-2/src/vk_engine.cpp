@@ -892,8 +892,8 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 3.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(5, 5, 5));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 50.0f, 3.0f));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(20, 20, 20));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -905,7 +905,7 @@ void VulkanEngine::init_volumetric_data()
     
     for (int i = 32768; i--;)
     {
-        _cloudVoxels.density[i] = (float)(rand());
+        _cloudVoxels.density[i] = (float)(rand())/1000.f;
     }
     VkExtent3D imageSize;
     imageSize.width = 32;
@@ -1368,23 +1368,30 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background(cmd);
     
-    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    
-    vkutil::copy_image_to_image(cmd, _backgroundImage.image, _drawImage.image, _drawExtent, _drawExtent);
-    //todo transition background image  change background image usage bits
-    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     draw_geometry(cmd);
 
+    //todo copy draw image to background image
+    //use background image to draw volumetrics
+
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    vkutil::copy_image_to_image(cmd, _drawImage.image, _backgroundImage.image, _drawExtent, _drawExtent);
+    //todo transition background image  change background image usage bits
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    draw_volumetrics(cmd);
+
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
 
@@ -1682,7 +1689,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     }
     for (auto r : mainDrawContext.VolumetricSurfaces)
     {
-        draw(r);
+       // draw(r);
     }
     for (auto r : mainDrawContext.TransparentSurfaces)
     {
@@ -1705,6 +1712,135 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     _renderTimeTimer->Stop();
     stats.meshDrawTime = _renderTimeTimer->GetElapsed();
+
+
+    vkCmdEndRendering(cmd);
+}
+
+void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
+{
+  
+
+  
+
+    VkRenderingAttachmentInfo colorAttachment =
+        vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depthAttachment =
+        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+
+    VkRenderingInfo renderInfo =
+        vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    //handle scene data
+    AllocatedBuffer gpuSceneDataBuffer = create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+    *sceneUniformData = sceneData;
+
+    VkDescriptorSet globalDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
+
+    DescriptorWriter writer;
+    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(sceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, globalDescriptor);
+
+
+
+    AllocatedBuffer gpuVoxelBuffer = create_buffer(sizeof(GPUVoxelBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    GPUVoxelBuffer* voxelBufferData = (GPUVoxelBuffer*)gpuVoxelBuffer.allocation->GetMappedData();
+    *voxelBufferData = _cloudVoxels.GPUVoxelInfo;
+    VkDescriptorSet voxelBufferDescriptor = get_current_frame()._frameDescriptors.allocate(_device, _voxelBufferDescriptorLayout);
+
+    writer.write_buffer(0, gpuVoxelBuffer.buffer, sizeof(_cloudVoxels.GPUVoxelInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, voxelBufferDescriptor);
+
+
+
+    MaterialPipeline* lastPipeline = nullptr;
+    MaterialInstance* lastMaterial = nullptr;
+    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+
+    auto draw = [&](const RenderObject& draw)
+        {
+
+            if (draw.material != lastMaterial)
+            {
+                lastMaterial = draw.material;
+
+                if (draw.material->pipeline != lastPipeline)
+                {
+                    lastPipeline = draw.material->pipeline;
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
+
+
+                    VkViewport viewport = {};
+                    viewport.x = 0;
+                    viewport.y = 0;
+                    viewport.width = _drawExtent.width;
+                    viewport.height = _drawExtent.height;
+                    viewport.minDepth = 0.f;
+                    viewport.maxDepth = 1.f;
+
+                    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+                    VkRect2D scissor = {};
+                    scissor.offset.x = 0;
+                    scissor.offset.y = 0;
+                    scissor.extent.width = _drawExtent.width;
+                    scissor.extent.height = _drawExtent.height;
+
+                    vkCmdSetScissor(cmd, 0, 1, &scissor);
+                }
+
+
+
+            
+                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
+                    DescriptorWriter writer;
+                    writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.write_image(11, _backgroundImage.imageView, _backgroundSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.update_set(_device, draw.material->materialSet);
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &voxelBufferDescriptor, 0, nullptr);
+                
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+            }
+
+            if (draw.indexBuffer != lastIndexBuffer)
+            {
+                lastIndexBuffer = draw.indexBuffer;
+                vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            }
+
+
+
+            GPUDrawPushConstants pushConstants;
+            pushConstants.vertexBuffer = draw.vertexBufferAddress;
+            pushConstants.worldMatrix = draw.transform;
+            vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
+
+   
+                vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+            
+
+            stats.drawcallCount++;
+            stats.triangleCount += draw.indexCount / 3;
+
+        };
+
+
+
+    for (auto r : mainDrawContext.VolumetricSurfaces)
+    {
+        draw(r);
+    }
+
+    get_current_frame()._deletionQueue.push_function([=, this]() {
+
+        destroy_buffer(gpuVoxelBuffer);
+        });
 
 
     vkCmdEndRendering(cmd);
