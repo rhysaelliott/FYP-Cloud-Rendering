@@ -23,6 +23,10 @@ float saturate(in float num)
 	return clamp(num, 0.0,1.0);
 }
 
+float random(vec2 uv) {
+    return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
 float HenyeyGreenstein(float cos_angle, float g)
 {
 	float g2 = g*g;
@@ -32,11 +36,10 @@ float HenyeyGreenstein(float cos_angle, float g)
 
 void main()
 {
-	float stepSize =1.0;
+	float stepSize =0.5;
 	float tMin=0;
-	float tMax=1000;
+	float tMax=128;
 
-	
 	vec3 voxelGridCentre = voxelInfo.centrePos.xyz;
 	vec3 voxelDimension = voxelInfo.bounds.xyz;
 
@@ -44,38 +47,70 @@ void main()
 	vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
 
 	vec3 rayDir = normalize(inPos -rayOrigin);
+
 	vec2 backgroundUV = (gl_FragCoord).xy / voxelInfo.screenRes;
 	vec3 backgroundColor = texture(backgroundTex,backgroundUV).xyz;
 
-	float accumulatedDensity =0.0;
-	float T =1.0;
+		vec3 sunlightColor = sceneData.sunlightColor.xyz;
+	vec3 sunlightDir = sceneData.sunlightDirection.xyz;
+
+	vec3 lightDir = normalize(sceneData.sunlightDirection).xyz;
+	float cosAngle = dot(rayDir,sunlightDir);
+	float phase = mix(HenyeyGreenstein(cosAngle,-0.3), HenyeyGreenstein(cosAngle,0.3),0.7);
+
+
+
+	float mu = 0.5+0.5*dot(rayDir, sunlightDir);
+
+	vec3 T =vec3(1.0); //total transmittance
 	float sigma_a =0.05; //absorbtion 
 	float sigma_s =0.05; //scattering
-	while(tMin<tMax && accumulatedDensity<1.0)
+	float sigma_t = sigma_a+sigma_s;
+
+	vec3 color = vec3(0.3); //todo set this to 0
+
+	float accumulatedDensity =0.0;
+	float thickness =0.0;
+
+	while(tMin<=tMax &&accumulatedDensity<1.0 )
 	{
-		vec3 samplePos = rayOrigin+ (rayDir*tMin); // worldspace
+		float jitter =(random(gl_FragCoord.xy) - 0.5) * stepSize;
+		tMin += jitter;
+		vec3 samplePos = rayOrigin+ (rayDir*tMin);
 		tMin+=stepSize;
+
 		if (!(samplePos.x >= voxelGridMin.x && samplePos.x <= voxelGridMax.x &&
             samplePos.y >= voxelGridMin.y && samplePos.y <= voxelGridMax.y &&
             samplePos.z >= voxelGridMin.z && samplePos.z <= voxelGridMax.z)) continue;
         
-		//todo add some random jittering to this to avoid banding
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
+		uvw = clamp(uvw, vec3(0),vec3(1));
 		float density =vec3(texture(voxelBuffer, (uvw))).r;
-		T *= exp(- density*(sigma_a+sigma_s));
 
-		accumulatedDensity+=density;
+
+		vec3 ambient = sunlightColor; //todo mix based on height of cloud
+
+
+		thickness+=density*stepSize;
+		accumulatedDensity+=density; //todo in future multiply by global density of volume
+
+		float alpha = exp(-thickness*density * sigma_t);
+
+		color+=alpha*phase*sigma_t*accumulatedDensity;
+
+		T *= exp(-sigma_t*accumulatedDensity);
 	}
 
 	//todo raymarch to sun determine volume colour
+	//from the final sample position, raymarch in direction of the sun 
 
-
-
-	vec3 volumeColor = vec3(0.01,0.01,0.01) * sceneData.sunlightColor.xyz;
-	vec3 backgroundColorThroughVolume =  T * backgroundColor + (1-T)*volumeColor;
+	color = (1.0-T * color) * (T*backgroundColor);
 
 	//backgroundColorThroughVolume = vec3(accumulatedDensity);
-	
-	
-	outFragColor =vec4(backgroundColorThroughVolume , 1.0);
+
+	//todo film mapping and gamma correction
+
+	color = pow(color, vec3(0.4545));
+
+	outFragColor =vec4(clamp(color,vec3(0),vec3(1)) , 1.0);
 }

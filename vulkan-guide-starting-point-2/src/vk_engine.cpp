@@ -248,6 +248,7 @@ void VulkanEngine::init_swapchain()
     backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 
 
@@ -341,7 +342,7 @@ void VulkanEngine::init_descriptors()
         _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
 
         DescriptorWriter writer;
-        writer.write_image(0, _backgroundImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
         writer.update_set(_device, _drawImageDescriptors);
     }
@@ -892,7 +893,7 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 50.0f, 3.0f));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(50.0f, 50.0f, 3.0f));
     obj.transform=  glm::scale(obj.transform, glm::vec3(20, 20, 20));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
@@ -905,14 +906,14 @@ void VulkanEngine::init_volumetric_data()
     
     for (int i = 32768; i--;)
     {
-        _cloudVoxels.density[i] = (float)(rand())/1000.f;
+        _cloudVoxels.density[i] = (float)(rand());
     }
     VkExtent3D imageSize;
     imageSize.width = 32;
     imageSize.height = 32;
     imageSize.depth = 32;
 
-    std::vector<char> voxelData(32768);
+    std::vector<char> voxelData(128);
     for (size_t i = 0; i < voxelData.size(); i++) 
     {
         voxelData[i] = static_cast<char>(_cloudVoxels.density[i]);
@@ -1386,12 +1387,12 @@ void VulkanEngine::draw()
     vkutil::copy_image_to_image(cmd, _drawImage.image, _backgroundImage.image, _drawExtent, _drawExtent);
     //todo transition background image  change background image usage bits
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     draw_volumetrics(cmd);
 
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
 
@@ -1719,10 +1720,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
 {
-  
-
-  
-
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingAttachmentInfo depthAttachment =
@@ -1838,7 +1835,7 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
     }
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
-
+        destroy_buffer(gpuSceneDataBuffer);
         destroy_buffer(gpuVoxelBuffer);
         });
 
