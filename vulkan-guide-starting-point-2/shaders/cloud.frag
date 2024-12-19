@@ -59,9 +59,6 @@ void main()
 	float phase = mix(HenyeyGreenstein(cosAngle,-0.3), HenyeyGreenstein(cosAngle,0.3),0.7);
 
 
-
-	float mu = 0.5+0.5*dot(rayDir, sunlightDir);
-
 	vec3 T =vec3(1.0); //total transmittance
 	float sigma_a =0.05; //absorbtion 
 	float sigma_s =0.05; //scattering
@@ -96,9 +93,9 @@ void main()
 
 		float alpha = exp(-thickness*density * sigma_t);
 
-		color+=alpha*phase*sigma_t*accumulatedDensity;
+		
 
-		T *= exp(-sigma_t*accumulatedDensity);
+		T *= exp(-sigma_t*thickness * phase);
 	}
 
 	//todo raymarch to sun determine volume colour
@@ -112,5 +109,5 @@ void main()
 
 	color = pow(color, vec3(0.4545));
 
-	outFragColor =vec4(clamp(color,vec3(0),vec3(1)) , 1.0);
+	outFragColor =vec4(color , 1.0);
 }
