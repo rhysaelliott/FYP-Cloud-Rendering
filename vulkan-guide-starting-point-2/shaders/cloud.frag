@@ -51,13 +51,12 @@ void main()
 	vec2 backgroundUV = (gl_FragCoord).xy / voxelInfo.screenRes;
 	vec3 backgroundColor = texture(backgroundTex,backgroundUV).xyz;
 
-		vec3 sunlightColor = sceneData.sunlightColor.xyz;
+	vec3 sunlightColor = sceneData.sunlightColor.xyz;
 	vec3 sunlightDir = sceneData.sunlightDirection.xyz;
 
 	vec3 lightDir = normalize(sceneData.sunlightDirection).xyz;
 	float cosAngle = dot(rayDir,sunlightDir);
 	float phase = mix(HenyeyGreenstein(cosAngle,-0.3), HenyeyGreenstein(cosAngle,0.3),0.7);
-
 
 
 	float mu = 0.5+0.5*dot(rayDir, sunlightDir);
@@ -67,10 +66,12 @@ void main()
 	float sigma_s =0.05; //scattering
 	float sigma_t = sigma_a+sigma_s;
 
-	vec3 color = vec3(0.3); //todo set this to 0
+	vec3 color = vec3(0.3); 
 
-	float accumulatedDensity =0.0;
-	float thickness =0.0;
+	float I =0.0; //illumination
+	float transmit = 1.0;
+
+	float accumulatedDensity=0.0;
 
 	while(tMin<=tMax &&accumulatedDensity<1.0 )
 	{
@@ -85,32 +86,27 @@ void main()
         
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
 		uvw = clamp(uvw, vec3(0),vec3(1));
-		float density =vec3(texture(voxelBuffer, (uvw))).r;
+		float density =vec3(texture(voxelBuffer, (uvw))).r * stepSize;
+
+		if(density>0.0)
+		{
+			accumulatedDensity+=density;
+
+			I+= density * transmit * phase;
+			transmit*= exp(-(density * (1- 0.05)));
+		}
 
 
-		vec3 ambient = sunlightColor; //todo mix based on height of cloud
 
-
-		thickness+=density*stepSize;
-		accumulatedDensity+=density; //todo in future multiply by global density of volume
-
-		float alpha = exp(-thickness*density * sigma_t);
-
-		color+=alpha*phase*sigma_t*accumulatedDensity;
-
-		T *= exp(-sigma_t*accumulatedDensity);
 	}
 
-	//todo raymarch to sun determine volume colour
-	//from the final sample position, raymarch in direction of the sun 
 
-	color = (1.0-T * color) * (T*backgroundColor);
 
-	//backgroundColorThroughVolume = vec3(accumulatedDensity);
 
+	vec3 finalColor = (sunlightColor * I) + backgroundColor * transmit;
+	//finalColor = vec3(accumulatedDensity);
 	//todo film mapping and gamma correction
 
-	color = pow(color, vec3(0.4545));
 
-	outFragColor =vec4(clamp(color,vec3(0),vec3(1)) , 1.0);
+	outFragColor =vec4(finalColor , 1.0);
 }

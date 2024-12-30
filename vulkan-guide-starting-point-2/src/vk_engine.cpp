@@ -906,7 +906,7 @@ void VulkanEngine::init_volumetric_data()
     
     for (int i = 32768; i--;)
     {
-        _cloudVoxels.density[i] = (float)(rand());
+        _cloudVoxels.density[i] = (float)(rand())/1000;
     }
     VkExtent3D imageSize;
     imageSize.width = 32;
