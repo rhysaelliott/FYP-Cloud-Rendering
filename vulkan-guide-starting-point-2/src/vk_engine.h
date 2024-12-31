@@ -9,6 +9,7 @@
 #include <vk_loader.h>
 #include <camera.h>
 #include <Timer.h>
+#include <glm/gtc/type_ptr.hpp>
 
 
 struct GLTFMetallic_Roughness
@@ -198,6 +199,13 @@ public:
 	VkDescriptorSetLayout _volumetricDescriptorLayout;
 	VkDescriptorSetLayout _voxelBufferDescriptorLayout;
 	MaterialInstance _volumetricMaterial;
+
+
+	ComputeEffect* _voxelGen;
+	VkDescriptorSetLayout _voxelGenDescriptorLayout;
+
+	VkPipeline _voxelGenPipeline;
+	VkPipelineLayout _voxelGenPipelineLayout;
 
 	//billboards
 	MaterialPipeline _billboardPipeline[2];

@@ -392,12 +392,17 @@ void VulkanEngine::init_descriptors()
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         _voxelBufferDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     }
- 
-
 
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        _voxelGenDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    }
+ 
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
         _singleImageDescriptorLayout = builder.build(_device,VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
@@ -411,6 +416,7 @@ void VulkanEngine::init_descriptors()
             vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _billboardPositionsDescriptorLayout, nullptr);
             vkDestroyDescriptorSetLayout(_device, _voxelBufferDescriptorLayout, nullptr);
+            vkDestroyDescriptorSetLayout(_device, _voxelGenDescriptorLayout, nullptr);
         });
 }
 
@@ -637,14 +643,66 @@ void VulkanEngine::init_volumetric_pipeline()
 
     _volumetricPipeline.pipeline = pipelineBuilder.build_pipeline(_device);
 
+
     vkDestroyShaderModule(_device, volumetricVertexShader, nullptr);
     vkDestroyShaderModule(_device, volumetricFragShader, nullptr);
+
+
+    VkPushConstantRange pushConstant{};
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(ComputePushConstants);
+    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkPipelineLayoutCreateInfo computeLayout = {};
+    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    computeLayout.pNext = nullptr;
+    computeLayout.pSetLayouts = &_voxelGenDescriptorLayout;
+    computeLayout.setLayoutCount = 1;
+
+    computeLayout.pPushConstantRanges = &pushConstant;
+    computeLayout.pushConstantRangeCount = 1;
+
+    VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_voxelGenPipelineLayout));
+
+    VkShaderModule voxelGenShader;
+    if (!vkutil::load_shader_module("../../shaders/voxelGen.comp.spv", _device, &voxelGenShader))
+    {
+        fmt::print("Error when building the compute shader \n");
+    }
+
+
+    VkPipelineShaderStageCreateInfo stageInfo = {};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.pNext = nullptr;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = voxelGenShader;
+    stageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo computePipelineCreateInfo{};
+    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineCreateInfo.pNext = nullptr;
+    computePipelineCreateInfo.layout = _voxelGenPipelineLayout;
+    computePipelineCreateInfo.stage = stageInfo;
+
+    _voxelGen = new ComputeEffect();
+    _voxelGen->layout = _voxelGenPipelineLayout;
+    _voxelGen->name = "voxelGen";
+    _voxelGen->data = {};
+
+
+    VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &_voxelGen->pipeline));
+
+
+    vkDestroyShaderModule(_device, voxelGenShader, nullptr);
+
 
     _mainDeletionQueue.push_function([&]()
         {
             vkDestroyDescriptorSetLayout(_device, _volumetricDescriptorLayout, nullptr);
             vkDestroyPipelineLayout(_device, _volumetricPipeline.layout, nullptr);
             vkDestroyPipeline(_device, _volumetricPipeline.pipeline, nullptr);
+            vkDestroyPipelineLayout(_device, _voxelGenPipelineLayout, nullptr);
+            vkDestroyPipeline(_device, _voxelGen->pipeline, nullptr);
         });
 }
 
@@ -857,6 +915,12 @@ void VulkanEngine::init_default_data()
     sceneLights.push_back(light1);
     sceneLights.push_back(light2);
 
+    sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
+
+    sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
+
+    sceneData.sunlightDirection = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+
 
     _renderTimeTimer = new Timer("Render Time");
 }
@@ -913,12 +977,12 @@ void VulkanEngine::init_volumetric_data()
     imageSize.height = 32;
     imageSize.depth = 32;
 
-    std::vector<char> voxelData(128);
+    std::vector<char> voxelData(1);
     for (size_t i = 0; i < voxelData.size(); i++) 
     {
         voxelData[i] = static_cast<char>(_cloudVoxels.density[i]);
     }
-    _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+    _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1301,11 +1365,7 @@ void VulkanEngine::update_scene()
     sceneData.proj[1][1] *= -1;
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
-    sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
 
-    sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
-
-    sceneData.sunlightDirection = glm::vec4(0.5f, -0.5f, 0.5f, 1.0f);
 
     update_volumetrics();
     update_billboards();
@@ -1951,9 +2011,11 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
-                if (ImGui::BeginTabItem("billboard"))
+                if (ImGui::BeginTabItem("clouds"))
                 {
                     ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
+                    ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
+                    ImGui::DragFloat3("Sunlight Direction", glm::value_ptr(sceneData.sunlightDirection), 0.05f, -1.0f, 1.0f, " % .15f");
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("stats"))
