@@ -395,7 +395,7 @@ void VulkanEngine::init_descriptors()
 
     {
         DescriptorLayoutBuilder builder;
-        builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
         _voxelGenDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
     }
  
@@ -968,20 +968,14 @@ void VulkanEngine::init_volumetric_data()
     _cloudVoxels.GPUVoxelInfo.centrePos = glm::vec4(glm::vec3(obj.transform[3]),0.f);
     _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(glm::vec3(obj.transform[0].x*2.f, obj.transform[1].y * 2.f, obj.transform[2].z * 2.f), 0);
     
-    for (int i = 32768; i--;)
-    {
-        _cloudVoxels.density[i] = (float)(rand())/1000;
-    }
+
     VkExtent3D imageSize;
     imageSize.width = 32;
     imageSize.height = 32;
     imageSize.depth = 32;
 
     std::vector<char> voxelData(1);
-    for (size_t i = 0; i < voxelData.size(); i++) 
-    {
-        voxelData[i] = static_cast<char>(_cloudVoxels.density[i]);
-    }
+
     _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
     VkSamplerCreateInfo samplerInfo = {};
@@ -1433,7 +1427,11 @@ void VulkanEngine::draw()
 
     draw_background(cmd);
 
+    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+
     draw_voxel_grid(cmd);
+
+    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -1531,7 +1529,6 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
 
     VkDescriptorSet voxelGenDescriptors =  get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
-
 
     DescriptorWriter writer;
     writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);

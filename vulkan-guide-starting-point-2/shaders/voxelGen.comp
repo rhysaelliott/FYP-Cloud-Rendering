@@ -11,7 +11,7 @@ void main()
     vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
 
 
-    float density = 1;
+    float density = fract(sin(dot(nPos, vec3(12.9898, 78.233, 54.53))) * 43758.5453123)/10.0;
 
     imageStore(densityTex, pos, vec4(density));
 
