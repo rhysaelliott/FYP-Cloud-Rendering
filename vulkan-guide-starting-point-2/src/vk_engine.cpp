@@ -1432,6 +1432,8 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_background(cmd);
+
+    draw_voxel_grid(cmd);
     
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -1515,6 +1517,32 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
 
     vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
+}
+
+void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
+{
+    //todo set up compute here
+    VkClearColorValue clearValue;
+    float flash = std::abs(std::sin(_frameNumber / 120.f));
+    clearValue = { {0.0f,0.f,flash,1.f} };
+
+    VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
+
+    VkDescriptorSet voxelGenDescriptors =  get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
+
+
+    DescriptorWriter writer;
+    writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+    writer.update_set(_device, voxelGenDescriptors);
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
+
+    vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
+
+    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width +15.0 / 16.0), std::ceil(_cloudVoxelImage.imageExtent.height + 15.0 / 16.0), std::ceil(_cloudVoxelImage.imageExtent.depth + 15.0 / 16.0));
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)

@@ -203,8 +203,6 @@ public:
 
 	ComputeEffect* _voxelGen;
 	VkDescriptorSetLayout _voxelGenDescriptorLayout;
-
-	VkPipeline _voxelGenPipeline;
 	VkPipelineLayout _voxelGenPipelineLayout;
 
 	//billboards
@@ -245,6 +243,8 @@ public:
 	void draw();
 
 	void draw_background(VkCommandBuffer cmd);
+
+	void draw_voxel_grid(VkCommandBuffer cmd);
 
 	void draw_geometry(VkCommandBuffer cmd);
 
