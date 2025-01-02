@@ -396,13 +396,15 @@ void VulkanEngine::init_descriptors()
     {
         DescriptorLayoutBuilder builder;
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        builder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        builder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
         _voxelGenDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
     }
  
 
     {
         DescriptorLayoutBuilder builder;
-        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
         _singleImageDescriptorLayout = builder.build(_device,VK_SHADER_STAGE_FRAGMENT_BIT);
     }
 
@@ -957,8 +959,8 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(50.0f, 50.0f, 3.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(20, 20, 20));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(200.0f, 50.0f, 3.0f));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(40, 40, 40));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -970,13 +972,33 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 32;
-    imageSize.height = 32;
-    imageSize.depth = 32;
+    imageSize.width = 64;
+    imageSize.height = 64;
+    imageSize.depth = 64;
 
     std::vector<char> voxelData(1);
 
     _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+    const char* fileName = "..\\..\\assets\\noiseShape.tga";
+    int width, height, channels;
+    unsigned char* data = stbi_load(fileName, &width, &height, &channels, 0);
+
+    imageSize.width = height;
+    imageSize.height = height;
+    imageSize.depth = width/height;
+
+    _cloudShapeNoiseImage = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+     fileName = "..\\..\\assets\\noiseErosion.tga";
+    data = stbi_load(fileName, &width, &height, &channels, 0);
+
+    imageSize.width = height;
+    imageSize.height = height;
+    imageSize.depth = width / height;
+
+    _cloudDetailNoiseImage = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
 
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -984,10 +1006,13 @@ void VulkanEngine::init_volumetric_data()
     samplerInfo.minFilter = VK_FILTER_LINEAR;
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudVoxelSampler);
+   // vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudShapeNoiseSampler);
     vkCreateSampler(_device, &samplerInfo, nullptr, &_backgroundSampler);
 
     _mainDeletionQueue.push_function([&]() {
         destroy_image(_cloudVoxelImage);
+        destroy_image(_cloudShapeNoiseImage);
+        destroy_image(_cloudDetailNoiseImage);
         vkDestroySampler(_device, _cloudVoxelSampler, nullptr);
         vkDestroySampler(_device, _backgroundSampler, nullptr);
         });
@@ -1293,14 +1318,9 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
 AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
 {
     size_t dataSize;
-    if (size.depth != 1)
-    {
-        dataSize = size.depth * size.width * size.height * 1;
-    }
-    else
-    {
-        dataSize = size.depth * size.width * size.height * 4;
-    }
+
+    dataSize = size.depth * size.width * size.height * 4;
+    
     AllocatedBuffer uploadBuffer = create_buffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     memcpy(uploadBuffer.info.pMappedData, data, dataSize);
@@ -1519,7 +1539,6 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 {
-    //todo set up compute here
     VkClearColorValue clearValue;
     float flash = std::abs(std::sin(_frameNumber / 120.f));
     clearValue = { {0.0f,0.f,flash,1.f} };
@@ -1533,13 +1552,16 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     DescriptorWriter writer;
     writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
+    writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
     writer.update_set(_device, voxelGenDescriptors);
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width +15.0 / 16.0), std::ceil(_cloudVoxelImage.imageExtent.height + 15.0 / 16.0), std::ceil(_cloudVoxelImage.imageExtent.depth + 15.0 / 16.0));
+    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width+7.0  / 8.0), std::ceil(_cloudVoxelImage.imageExtent.height + 7.0 / 8.0), std::ceil(_cloudVoxelImage.imageExtent.depth + 7.0 / 8.0));
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)

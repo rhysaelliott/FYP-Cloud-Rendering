@@ -202,6 +202,8 @@ public:
 
 
 	ComputeEffect* _voxelGen;
+	AllocatedImage _cloudShapeNoiseImage;
+	AllocatedImage _cloudDetailNoiseImage;
 	VkDescriptorSetLayout _voxelGenDescriptorLayout;
 	VkPipelineLayout _voxelGenPipelineLayout;
 

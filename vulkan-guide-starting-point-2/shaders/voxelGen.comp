@@ -1,8 +1,13 @@
 #version 460
 
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 layout(r8, binding = 0) uniform image3D densityTex;
+
+layout(set=0, binding=1) uniform sampler3D shapeNoiseTex;
+layout(set=0, binding=2) uniform sampler3D detailNoiseTex;
+
+
 
 
 void main() 
@@ -11,9 +16,33 @@ void main()
     vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
 
 
-    float density = fract(sin(dot(nPos, vec3(12.9898, 78.233, 54.53))) * 43758.5453123)/10.0;
 
-    imageStore(densityTex, pos, vec4(density));
+
+
+
+    vec4 shapeNoise =texture(shapeNoiseTex, nPos) ;
+    vec4 detailNoise =texture(detailNoiseTex, nPos) ;
+
+    float fbm = dot(shapeNoise, vec4(0.1,1.0,0.3,0.7));
+    float detailFbm = dot(detailNoise, vec4(0.7,0.8,0.3,0.6));
+
+    float cloudDensity =0.5;
+
+    float density = cloudDensity - detailFbm * pow(1-fbm,3);
+
+    float width = vec3(imageSize(densityTex)).x;
+    float height =  vec3(imageSize(densityTex)).y;
+    float depth =  vec3(imageSize(densityTex)).z;
+
+    vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
+    float edgeDistance = min(min(edgeProximity.x, edgeProximity.y), edgeProximity.z);
+
+    density *= edgeDistance *0.5 ;
+
+    density = pow(density, 3 );
+    density*=2;
+
+    imageStore(densityTex, pos, vec4(density,0,0,0));
 
 
 }

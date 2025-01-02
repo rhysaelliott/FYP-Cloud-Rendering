@@ -101,8 +101,6 @@ void main()
 	}
 
 
-
-
 	vec3 finalColor = (sunlightColor * I) + backgroundColor * transmit;
 	//finalColor = vec3(accumulatedDensity);
 	//todo film mapping and gamma correction
