@@ -36,9 +36,14 @@ float HenyeyGreenstein(float cos_angle, float g)
 
 void main()
 {
-	float stepSize =0.5;
+	float stepSize =1.0;
 	float tMin=0;
 	float tMax=128;
+
+	float sunStepSize =5;
+	float sunTMin =0;
+	float sunTMax = 128;
+	float sunAccumulatedDensity=0;
 
 	vec3 voxelGridCentre = voxelInfo.centrePos.xyz;
 	vec3 voxelDimension = voxelInfo.bounds.xyz;
@@ -52,19 +57,11 @@ void main()
 	vec3 backgroundColor = texture(backgroundTex,backgroundUV).xyz;
 
 	vec3 sunlightColor = sceneData.sunlightColor.xyz;
-	vec3 sunlightDir = sceneData.sunlightDirection.xyz;
+	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
 
-	vec3 lightDir = normalize(sceneData.sunlightDirection).xyz;
 	float cosAngle = dot(rayDir,sunlightDir);
 	float phase = mix(HenyeyGreenstein(cosAngle,-0.3), HenyeyGreenstein(cosAngle,0.3),0.7);
 
-
-	float mu = 0.5+0.5*dot(rayDir, sunlightDir);
-
-	vec3 T =vec3(1.0); //total transmittance
-	float sigma_a =0.05; //absorbtion 
-	float sigma_s =0.05; //scattering
-	float sigma_t = sigma_a+sigma_s;
 
 	vec3 color = vec3(0.3); 
 
@@ -75,10 +72,11 @@ void main()
 
 	while(tMin<=tMax &&accumulatedDensity<1.0 )
 	{
+		tMin+=stepSize;
 		float jitter =(random(gl_FragCoord.xy) - 0.5) * stepSize;
 		tMin += jitter;
 		vec3 samplePos = rayOrigin+ (rayDir*tMin);
-		tMin+=stepSize;
+
 
 		if (!(samplePos.x >= voxelGridMin.x && samplePos.x <= voxelGridMax.x &&
             samplePos.y >= voxelGridMin.y && samplePos.y <= voxelGridMax.y &&
@@ -86,18 +84,42 @@ void main()
         
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
 		uvw = clamp(uvw, vec3(0),vec3(1));
-		float density =vec3(texture(voxelBuffer, (uvw))).r * stepSize;
+		float density =vec3(texture(voxelBuffer, uvw)).r * stepSize;
 
 		if(density>0.0)
 		{
 			accumulatedDensity+=density;
 
-			I+= density * transmit * phase;
-			transmit*= exp(-(density * (1- 0.05)));
+			
+			//todo march to light to see how much light that area should receive
+
+			vec3 toSun = -sunlightDir;
+			float sunTransmit =0.0;
+			while(sunTMin<=tMax && sunAccumulatedDensity<1.0)
+			{
+				sunTMin+=sunStepSize + jitter;
+				vec3 sunSamplePos = samplePos+ (toSun*sunTMin);
+
+						if (!(sunSamplePos.x >= voxelGridMin.x && sunSamplePos.x <= voxelGridMax.x &&
+            			sunSamplePos.y >= voxelGridMin.y && sunSamplePos.y <= voxelGridMax.y &&
+            			sunSamplePos.z >= voxelGridMin.z && sunSamplePos.z <= voxelGridMax.z)) continue;
+
+						uvw = (sunSamplePos-voxelGridMin) / (voxelGridMax - voxelGridMin);
+						uvw=clamp(uvw, vec3(0),vec3(1));
+
+						float sunDensity = vec3(texture(voxelBuffer, uvw)).r*stepSize;
+
+						sunAccumulatedDensity+=sunDensity;
+			}
+
+						float outScatterMultiplier =0.5;
+
+			sunTransmit = exp(-(sunAccumulatedDensity) * (1-outScatterMultiplier) );
+
+
+			I+= density * transmit * phase * sunTransmit ;
+			transmit*= exp(-(density * (1- outScatterMultiplier)));
 		}
-
-
-
 	}
 
 

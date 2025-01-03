@@ -959,8 +959,8 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(200.0f, 50.0f, 3.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(40, 40, 40));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(50, 50, 50));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 

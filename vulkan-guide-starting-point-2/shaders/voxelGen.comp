@@ -14,33 +14,29 @@ void main()
 {
     ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
     vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
-
-
-
-
-
-
-    vec4 shapeNoise =texture(shapeNoiseTex, nPos) ;
-    vec4 detailNoise =texture(detailNoiseTex, nPos) ;
-
-    float fbm = dot(shapeNoise, vec4(0.1,1.0,0.3,0.7));
-    float detailFbm = dot(detailNoise, vec4(0.7,0.8,0.3,0.6));
-
-    float cloudDensity =0.5;
-
-    float density = cloudDensity - detailFbm * pow(1-fbm,3);
-
-    float width = vec3(imageSize(densityTex)).x;
-    float height =  vec3(imageSize(densityTex)).y;
-    float depth =  vec3(imageSize(densityTex)).z;
+    
+    vec3 tiledNPos = fract(nPos *0.1);
+    float height = nPos.y;
 
     vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
     float edgeDistance = min(min(edgeProximity.x, edgeProximity.y), edgeProximity.z);
 
-    density *= edgeDistance *0.5 ;
 
-    density = pow(density, 3 );
-    density*=2;
+
+    vec4 shapeNoise =texture(shapeNoiseTex, tiledNPos) ;
+    vec4 detailNoise =texture(detailNoiseTex, tiledNPos) ;
+
+
+    float fbm = dot(shapeNoise, vec4(0.5,0.5,0.5,0.5)) * edgeDistance * height;
+    float detailFbm = dot(detailNoise, vec4(0.5,0.5,0.5,0.5)) * (1.0-height);
+
+    float cloudDensity =fbm +0.1 * 0.05;
+
+    float density = cloudDensity - detailFbm * pow(1-fbm,3);
+
+
+
+
 
     imageStore(densityTex, pos, vec4(density,0,0,0));
 
