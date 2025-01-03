@@ -930,7 +930,7 @@ void VulkanEngine::init_default_data()
 void VulkanEngine::init_volumetric_data()
 {
     std::array<Vertex, 8> vertices = {
-        Vertex{{-1.0f, -1.0f, -1.0f}},
+        Vertex{{-1.0f, -1.0f, -1.0f}, },
         Vertex{{ 1.0f, -1.0f, -1.0f}},
         Vertex{{ 1.0f,  1.0f, -1.0f}},
         Vertex{{-1.0f,  1.0f, -1.0f}}, 
@@ -1022,13 +1022,13 @@ void VulkanEngine::init_billboard_data()
 {
 
     std::array<Vertex, 4> vertices = {
- Vertex{{-1.0f, -1.0f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
+ Vertex{{-1.0f, -1.0f, 0.0f}, 0.0f, {1.0f, 1.0f, 1.0f}, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f}},
 
- Vertex{{ 1.0f, -1.0f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f}},
+ Vertex{{ 1.0f, -1.0f, 0.0f}, 1.0f, {1.0f, 1.0f, 1.0f}, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f}},
 
- Vertex{{ 1.0f,  1.0f, 0.0f}, 1.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f}},
+ Vertex{{ 1.0f,  1.0f, 0.0f}, 1.0f, {1.0f, 1.0f, 1.0f}, 1.0f, {0.0f, 0.0f, 1.0f, 1.0f}},
 
- Vertex{{-1.0f,  1.0f, 0.0f}, 0.0f, {0.0f, 0.0f, 1.0f}, 1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}
+ Vertex{{-1.0f,  1.0f, 0.0f}, 0.0f, {1.0f, 1.0f, 1.0f}, 1.0f, {1.0f, 1.0f, 1.0f, 1.0f}}
     };
 
     std::array<uint32_t, 6> indices = {

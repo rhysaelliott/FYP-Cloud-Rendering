@@ -27,11 +27,9 @@ float random(vec2 uv) {
     return fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453123);
 }
 
-float HenyeyGreenstein(float cos_angle, float g)
+float HenyeyGreenstein(float angle, float g)
 {
-	float g2 = g*g;
-	float val = ((1.0-g2)/pow(1.0+g2-2.0*g*cos_angle,1.5))/4 * PI;
-	return val;
+	return (1.0f - pow(g,2)) / (4.0f * 3.14159 * pow(1 + pow(g, 2) - 2.0f * g * angle, 1.5f));
 }
 
 void main()
@@ -44,6 +42,7 @@ void main()
 	float sunTMin =0;
 	float sunTMax = 128;
 	float sunAccumulatedDensity=0;
+	float outScatterMultiplier =0.005;
 
 	vec3 voxelGridCentre = voxelInfo.centrePos.xyz;
 	vec3 voxelDimension = voxelInfo.bounds.xyz;
@@ -60,13 +59,14 @@ void main()
 	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
 
 	float cosAngle = dot(rayDir,sunlightDir);
-	float phase = mix(HenyeyGreenstein(cosAngle,-0.3), HenyeyGreenstein(cosAngle,0.3),0.7);
+	float phase = HenyeyGreenstein(1, cosAngle) + HenyeyGreenstein(-1,cosAngle)/2.0 ;
 
 
 	vec3 color = vec3(0.3); 
 
 	float I =0.0; //illumination
 	float transmit = 1.0;
+	float sunTransmit =1.0;
 
 	float accumulatedDensity=0.0;
 
@@ -90,15 +90,13 @@ void main()
 		{
 			accumulatedDensity+=density;
 
-			
-			//todo march to light to see how much light that area should receive
-
+	
 			vec3 toSun = -sunlightDir;
-			float sunTransmit =0.0;
+
 			while(sunTMin<=tMax && sunAccumulatedDensity<1.0)
 			{
-				sunTMin+=sunStepSize + jitter;
 				vec3 sunSamplePos = samplePos+ (toSun*sunTMin);
+				sunTMin+=sunStepSize + jitter;
 
 						if (!(sunSamplePos.x >= voxelGridMin.x && sunSamplePos.x <= voxelGridMax.x &&
             			sunSamplePos.y >= voxelGridMin.y && sunSamplePos.y <= voxelGridMax.y &&
@@ -110,11 +108,11 @@ void main()
 						float sunDensity = vec3(texture(voxelBuffer, uvw)).r*stepSize;
 
 						sunAccumulatedDensity+=sunDensity;
+						sunTransmit *= exp(-(sunDensity * (1-outScatterMultiplier)));
 			}
 
-						float outScatterMultiplier =0.5;
 
-			sunTransmit = exp(-(sunAccumulatedDensity) * (1-outScatterMultiplier) );
+
 
 
 			I+= density * transmit * phase * sunTransmit ;
@@ -123,8 +121,8 @@ void main()
 	}
 
 
-	vec3 finalColor = (sunlightColor * I) + backgroundColor * transmit;
-	//finalColor = vec3(accumulatedDensity);
+	vec3 finalColor = (sunlightColor * I) + backgroundColor * transmit ;
+	//finalColor = vec3(sunAccumulatedDensity);
 	//todo film mapping and gamma correction
 
 

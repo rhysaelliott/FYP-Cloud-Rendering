@@ -60,14 +60,14 @@ void main()
 
 
 
-	float lightValue = max(dot(inNormal, sceneData.sunlightDirection.xyz), 0.1f);
-	lightValue = mix(0.1f, lightValue, lightValue);
+	float lightValue = max(dot(inNormal, -sceneData.sunlightDirection.xyz),0.1);
+
 
 	vec3 color = base.xyz;
 	vec3 ambient = color * sceneData.ambientColor.xyz * ((base.r+base.g+base.b)/3.0);
 
 	float rim = pow(1.0-lightValue,3.0);
-	vec3 rimColor = sceneData.sunlightColor.xyz * rim * 0.2;
+	vec3 rimColor =	clamp( sceneData.sunlightColor.xyz * rim * 0.2, vec3(0), vec3(0.1));
 
 	float distanceToCamera =length(inPos.xyz - inverse(sceneData.view)[3].xyz);
 
@@ -76,5 +76,5 @@ void main()
 
 	float fadeFactor = saturate((distanceToCamera-fadeEnd)/(fadeStart-fadeEnd));
 
-	outFragColor =vec4(color+(lightValue*sceneData.sunlightColor.xyz)+ambient + rimColor, base.a*fadeFactor);
+	outFragColor =vec4(color+ambient +min((lightValue*sceneData.sunlightColor.xyz),vec3(0.1))+ rimColor, base.a*fadeFactor);
 }
