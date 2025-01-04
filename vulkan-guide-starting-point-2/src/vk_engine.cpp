@@ -1004,6 +1004,8 @@ void VulkanEngine::init_volumetric_data()
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
+   
+    
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudVoxelSampler);
    // vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudShapeNoiseSampler);

@@ -40,7 +40,7 @@ void main()
 
 	float sunStepSize =5;
 	float sunTMin =0;
-	float sunTMax = 128;
+	float sunTMax = 50;
 	float sunAccumulatedDensity=0;
 	float outScatterMultiplier =0.005;
 
@@ -61,8 +61,6 @@ void main()
 	float cosAngle = dot(rayDir,sunlightDir);
 	float phase = HenyeyGreenstein(1, cosAngle) + HenyeyGreenstein(-1,cosAngle)/2.0 ;
 
-
-	vec3 color = vec3(0.3); 
 
 	float I =0.0; //illumination
 	float transmit = 1.0;
@@ -121,7 +119,7 @@ void main()
 	}
 
 
-	vec3 finalColor = (sunlightColor * I) + backgroundColor * transmit ;
+	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
 	//finalColor = vec3(sunAccumulatedDensity);
 	//todo film mapping and gamma correction
 

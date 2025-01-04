@@ -15,7 +15,6 @@ void main()
     ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
     vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
     
-    vec3 tiledNPos = fract(nPos *0.1);
     float height = nPos.y;
 
     vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
@@ -23,18 +22,16 @@ void main()
 
 
 
-    vec4 shapeNoise =texture(shapeNoiseTex, tiledNPos) ;
-    vec4 detailNoise =texture(detailNoiseTex, tiledNPos) ;
+    vec4 shapeNoise =texture(shapeNoiseTex, nPos*2) ;
+    vec4 detailNoise =texture(detailNoiseTex, nPos*2) ;
 
 
-    float fbm = dot(shapeNoise, vec4(0.5,0.5,0.5,0.5)) * edgeDistance * height;
+    float fbm = dot(shapeNoise, vec4(1.0,0.0,0.1,0.1)) * edgeDistance * height;
     float detailFbm = dot(detailNoise, vec4(0.5,0.5,0.5,0.5)) * (1.0-height);
 
-    float cloudDensity =fbm +0.1 * 0.05;
+    float cloudDensity =fbm ;
 
     float density = cloudDensity - detailFbm * pow(1-fbm,3);
-
-
 
 
 
