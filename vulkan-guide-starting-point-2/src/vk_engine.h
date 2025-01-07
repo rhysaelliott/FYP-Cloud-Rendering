@@ -206,6 +206,12 @@ public:
 	AllocatedImage _cloudDetailNoiseImage;
 	VkDescriptorSetLayout _voxelGenDescriptorLayout;
 	VkPipelineLayout _voxelGenPipelineLayout;
+	GPUVoxelGenBuffer _voxelGenInfo;
+
+	VkSampler _cloudShapeSampler;
+	VkSampler _cloudNoiseSampler;
+
+	Timer* _voxelGenTimer;
 
 	//billboards
 	MaterialPipeline _billboardPipeline[2];

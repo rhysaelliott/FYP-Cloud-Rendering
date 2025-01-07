@@ -19,9 +19,9 @@ public:
 	void Stop()
 	{
 		auto end = std::chrono::steady_clock::now();
-		elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		callCount++;
-		totalElapsed += elapsed.count() / 1000.f;
+		totalElapsed += elapsed.count() /1000.f;
 	}
 	float GetElapsed() 
 	{
@@ -31,11 +31,16 @@ public:
 	{
 		return totalElapsed/callCount;
 	}
+	float GetTotalElapsed()
+	{
+
+		return fmod(totalElapsed,100.f)/100.f;
+	}
 
 private:
 
 	std::chrono::steady_clock::time_point start;
-	std::chrono::microseconds elapsed;
+	std::chrono::milliseconds elapsed;
 	float totalElapsed;
 	std::string name;
 	uint32_t callCount;

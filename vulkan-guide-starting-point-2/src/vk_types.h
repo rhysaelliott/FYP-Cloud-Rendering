@@ -236,6 +236,35 @@ struct GPUVoxelBuffer
 	glm::vec2 screenResolution;
 };
 
+struct GPUVoxelGenBuffer
+{
+	glm::vec4 shapeNoiseWeights;
+	glm::vec4 detailNoiseWeights;
+
+	float densityMultiplier;
+	float detailNoiseMultiplier;
+	float detailNoiseScale;
+	float heightMapFactor;
+
+	float cloudSpeed;
+	float detailSpeed;
+	float time;
+
+	GPUVoxelGenBuffer()
+	{
+		shapeNoiseWeights = glm::vec4(1.0f, 0.0f, 0.1f, 0.1f);
+		detailNoiseWeights = glm::vec4(.5f, .5f, .5f, .5f);
+		densityMultiplier = 0.1f;
+		detailNoiseMultiplier = 1.f;
+		detailNoiseScale = 1.f;
+
+		heightMapFactor = 0.25f;
+		cloudSpeed = 1.f;
+		detailSpeed = 1.f;
+		time = 0.f;
+	}
+};
+
 struct VoxelGrid
 {
 	float density[32768]; //flattened 32*32*32 array 

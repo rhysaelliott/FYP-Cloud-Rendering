@@ -398,6 +398,7 @@ void VulkanEngine::init_descriptors()
         builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
         builder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
         builder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        builder.add_binding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         _voxelGenDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
     }
  
@@ -1004,11 +1005,18 @@ void VulkanEngine::init_volumetric_data()
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
    
+    _voxelGenTimer = new Timer("VoxelGen");
+
     
 
     vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudVoxelSampler);
-   // vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudShapeNoiseSampler);
+    vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudShapeSampler);
+    vkCreateSampler(_device, &samplerInfo, nullptr, &_cloudNoiseSampler);
+
     vkCreateSampler(_device, &samplerInfo, nullptr, &_backgroundSampler);
 
     _mainDeletionQueue.push_function([&]() {
@@ -1016,6 +1024,8 @@ void VulkanEngine::init_volumetric_data()
         destroy_image(_cloudShapeNoiseImage);
         destroy_image(_cloudDetailNoiseImage);
         vkDestroySampler(_device, _cloudVoxelSampler, nullptr);
+        vkDestroySampler(_device, _cloudShapeSampler, nullptr);
+        vkDestroySampler(_device, _cloudNoiseSampler, nullptr);
         vkDestroySampler(_device, _backgroundSampler, nullptr);
         });
 }
@@ -1395,9 +1405,14 @@ void VulkanEngine::update_scene()
 void VulkanEngine::update_volumetrics()
 {
 
-    // todo 
+    _voxelGenInfo.time = _voxelGenTimer->GetTotalElapsed() ;
+    
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
+
+    //todo update time here
+
+
 }
 
 void VulkanEngine::update_billboards()
@@ -1554,8 +1569,14 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     DescriptorWriter writer;
     writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-    writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudShapeSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudNoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+    AllocatedBuffer gpuVoxelGenBuffer = create_buffer(sizeof(GPUVoxelGenBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    GPUVoxelGenBuffer* voxelGenBufferData = (GPUVoxelGenBuffer*)gpuVoxelGenBuffer.allocation->GetMappedData();
+    *voxelGenBufferData = _voxelGenInfo;
+
+    writer.write_buffer(3, gpuVoxelGenBuffer.buffer, sizeof(_voxelGenInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
     writer.update_set(_device, voxelGenDescriptors);
 
@@ -1564,6 +1585,11 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
     vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width+7.0  / 8.0), std::ceil(_cloudVoxelImage.imageExtent.height + 7.0 / 8.0), std::ceil(_cloudVoxelImage.imageExtent.depth + 7.0 / 8.0));
+
+    get_current_frame()._deletionQueue.push_function([=, this]() {
+        destroy_buffer(gpuVoxelGenBuffer);
+        });
+
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
@@ -2000,6 +2026,8 @@ void VulkanEngine::run()
     // main loop
     while (!bQuit) {
         auto start = std::chrono::system_clock::now();
+
+        _voxelGenTimer->Start();
         // Handle events on queue
         while (SDL_PollEvent(&e) != 0) {
             // close the window when user alt-f4s or clicks the X button
@@ -2062,9 +2090,29 @@ void VulkanEngine::run()
             {
                 if (ImGui::BeginTabItem("clouds"))
                 {
-                    ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
+                    ImGui::Text("General");
+                    ImGui::Spacing();
                     ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
                     ImGui::DragFloat3("Sunlight Direction", glm::value_ptr(sceneData.sunlightDirection), 0.05f, -1.0f, 1.0f, " % .15f");
+                    
+                    ImGui::Text("Billboard Clouds");
+                    ImGui::Spacing();
+                    ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
+
+                    ImGui::Text("Volumetric Clouds");
+                    ImGui::Spacing();
+                    ImGui::DragFloat4("Shape Noise Weights", glm::value_ptr(_voxelGenInfo.shapeNoiseWeights),0.005f ,0.f,1.f, " % .15f");
+                    ImGui::DragFloat4("Detail Noise Weights", glm::value_ptr(_voxelGenInfo.detailNoiseWeights),0.005f ,0.f,1.f, " % .15f");
+
+                    ImGui::DragFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.005f, 0.f, 1.f, "%.15f");
+                    ImGui::SliderFloat("Detail Noise Multiplier", &_voxelGenInfo.detailNoiseMultiplier,  0.f, 10.f, "%.15f");
+                    ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 20.f, "%.15f");
+
+
+                    ImGui::DragFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.005f, 0.f, 1.f, "%.15f");
+                    ImGui::DragFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.005f, 0.f, 1.f, "%.15f");
+                    ImGui::DragFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.005f, 0.f, 1.f, "%.15f");
+
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("stats"))
@@ -2087,6 +2135,8 @@ void VulkanEngine::run()
         draw();
 
         auto end = std::chrono::system_clock::now();
+
+        _voxelGenTimer->Stop();
 
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         stats.frametime = elapsed.count() / 1000.f;
