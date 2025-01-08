@@ -2104,14 +2104,23 @@ void VulkanEngine::run()
                     ImGui::DragFloat4("Shape Noise Weights", glm::value_ptr(_voxelGenInfo.shapeNoiseWeights),0.005f ,0.f,1.f, " % .15f");
                     ImGui::DragFloat4("Detail Noise Weights", glm::value_ptr(_voxelGenInfo.detailNoiseWeights),0.005f ,0.f,1.f, " % .15f");
 
-                    ImGui::DragFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.005f, 0.f, 1.f, "%.15f");
+                    ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 1.f, "%.15f");
                     ImGui::SliderFloat("Detail Noise Multiplier", &_voxelGenInfo.detailNoiseMultiplier,  0.f, 10.f, "%.15f");
-                    ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 20.f, "%.15f");
+                    ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.15f");
 
 
-                    ImGui::DragFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.005f, 0.f, 1.f, "%.15f");
-                    ImGui::DragFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.005f, 0.f, 1.f, "%.15f");
-                    ImGui::DragFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.005f, 0.f, 1.f, "%.15f");
+                    ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.f, 1.f, "%.15f");
+                    ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.15f");
+                    ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed,  0.f, 100.f, "%.15f");
+
+                    ImGui::SliderFloat("Step Size", &_cloudVoxels.GPUVoxelInfo.stepSize, 0.2f, 20.f, "%.15f");
+                    ImGui::SliderFloat("Step Max", &_cloudVoxels.GPUVoxelInfo.stepMax, 1.f, 240.f, "%.15f");
+
+                    ImGui::SliderFloat("Sun Step Size", &_cloudVoxels.GPUVoxelInfo.sunStepSize, 0.1f, 10.f, "%.15f");
+                    ImGui::SliderFloat("Sun Step Max", &_cloudVoxels.GPUVoxelInfo.sunStepMax, 1.f, 50.f, "%.15f");
+
+                    ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.05f, .5f, "%.05f");
+
 
                     ImGui::EndTabItem();
                 }

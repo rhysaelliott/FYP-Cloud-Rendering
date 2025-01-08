@@ -234,6 +234,23 @@ struct GPUVoxelBuffer
 	glm::vec4 centrePos;
 	glm::vec4 bounds;
 	glm::vec2 screenResolution;
+
+	float stepSize;
+	float stepMax;
+
+	float sunStepSize;
+	float sunStepMax;
+	float outScatterMultiplier;
+	float padding;
+
+	GPUVoxelBuffer()
+	{
+		stepSize = 1.0f;
+		stepMax = 128.f;
+		sunStepSize = 5.f;
+		sunStepMax = 50.f;
+		outScatterMultiplier = 0.005f;
+	}
 };
 
 struct GPUVoxelGenBuffer
@@ -249,18 +266,19 @@ struct GPUVoxelGenBuffer
 	float cloudSpeed;
 	float detailSpeed;
 	float time;
+	float padding;
 
 	GPUVoxelGenBuffer()
 	{
-		shapeNoiseWeights = glm::vec4(1.0f, 0.0f, 0.1f, 0.1f);
-		detailNoiseWeights = glm::vec4(.5f, .5f, .5f, .5f);
+		shapeNoiseWeights = glm::vec4(0.7f, 0.37f, 0.25f, 0.0f);
+		detailNoiseWeights = glm::vec4(.4f, .7f, .5f, .25f);
 		densityMultiplier = 0.1f;
 		detailNoiseMultiplier = 1.f;
-		detailNoiseScale = 1.f;
+		detailNoiseScale = 0.8f;
 
 		heightMapFactor = 0.25f;
-		cloudSpeed = 1.f;
-		detailSpeed = 1.f;
+		cloudSpeed = 0.8f;
+		detailSpeed = 15.f;
 		time = 0.f;
 	}
 };
