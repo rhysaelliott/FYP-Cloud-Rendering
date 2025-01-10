@@ -285,7 +285,6 @@ struct GPUVoxelGenBuffer
 
 struct VoxelGrid
 {
-	float density[32768]; //flattened 32*32*32 array 
 	GPUVoxelBuffer GPUVoxelInfo;
 };
 

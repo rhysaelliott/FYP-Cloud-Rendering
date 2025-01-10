@@ -973,9 +973,9 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 64;
-    imageSize.height = 64;
-    imageSize.depth = 64;
+    imageSize.width = 32;
+    imageSize.height = 32;
+    imageSize.depth = 32;
 
     std::vector<char> voxelData(1);
 
@@ -1475,7 +1475,6 @@ void VulkanEngine::draw()
 
     draw_geometry(cmd);
 
-    //todo copy draw image to background image
     //use background image to draw volumetrics
 
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -2026,6 +2025,8 @@ void VulkanEngine::run()
     // main loop
     while (!bQuit) {
         auto start = std::chrono::system_clock::now();
+
+       OPTICK_FRAME("main");
 
         _voxelGenTimer->Start();
         // Handle events on queue

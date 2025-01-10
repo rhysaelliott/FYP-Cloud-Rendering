@@ -50,3 +50,23 @@ target_sources(imgui PRIVATE
 target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL2::SDL2)
 
 target_include_directories(stb_image INTERFACE stb_image)
+
+
+file(GLOB OPTICK_SRC "src/*.*")
+source_group("OptickCore" FILES ${OPTICK_SRC})
+add_library(OptickCore STATIC ${OPTICK_SRC})
+
+target_include_directories(OptickCore
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/src>
+)
+set_target_properties(OptickCore 
+  PROPERTIES 
+    PUBLIC_HEADER "${CMAKE_CURRENT_LIST_DIR}/src/optick.h;${CMAKE_CURRENT_LIST_DIR}/src/optick.config.h"
+     
+)
+  find_package(Vulkan REQUIRED)
+target_link_libraries(OptickCore PRIVATE Vulkan::Vulkan)
+
+  target_compile_definitions(OptickCore PRIVATE OPTICK_ENABLE_GPU=1)
+  target_compile_definitions(OptickCore PRIVATE OPTICK_ENABLE_GPU_D3D12=0)

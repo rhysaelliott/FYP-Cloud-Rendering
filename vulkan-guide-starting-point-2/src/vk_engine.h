@@ -10,6 +10,9 @@
 #include <camera.h>
 #include <Timer.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <optick.h>
+
+
 
 
 struct GLTFMetallic_Roughness
