@@ -973,13 +973,13 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 32;
-    imageSize.height = 32;
-    imageSize.depth = 32;
+    imageSize.width = 128;
+    imageSize.height = 128;
+    imageSize.depth = 128;
 
-    std::vector<char> voxelData(1);
+  
 
-    _cloudVoxelImage = create_image(voxelData.data(), imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
+    _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
     const char* fileName = "..\\..\\assets\\noiseShape.tga";
     int width, height, channels;
@@ -1376,6 +1376,7 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 
 void VulkanEngine::update_scene()
 {
+    OPTICK_EVENT();
     auto start = std::chrono::system_clock::now();
 
     mainDrawContext.OpaqueSurfaces.clear();
@@ -1404,7 +1405,7 @@ void VulkanEngine::update_scene()
 
 void VulkanEngine::update_volumetrics()
 {
-
+    OPTICK_EVENT();
     _voxelGenInfo.time = _voxelGenTimer->GetTotalElapsed() ;
     
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
@@ -1417,6 +1418,7 @@ void VulkanEngine::update_volumetrics()
 
 void VulkanEngine::update_billboards()
 {
+    OPTICK_EVENT();
     if (_billboardTransparencyType == 0)
     {
         _billboardMaterial.pipeline = &_billboardPipeline[0];
@@ -1429,6 +1431,7 @@ void VulkanEngine::update_billboards()
 
 void VulkanEngine::draw()
 {
+    OPTICK_EVENT();
     update_scene();
 
     //wait for gpu to render last frame
@@ -1464,7 +1467,7 @@ void VulkanEngine::draw()
 
     draw_background(cmd);
 
-    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     draw_voxel_grid(cmd);
 
@@ -1536,6 +1539,7 @@ void VulkanEngine::draw()
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd)
 {
+    OPTICK_EVENT();
     VkClearColorValue clearValue;
     float flash = std::abs(std::sin(_frameNumber / 120.f));
     clearValue = { {0.0f,0.f,flash,1.f} };
@@ -1555,6 +1559,7 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 {
+    OPTICK_EVENT();
     VkClearColorValue clearValue;
     float flash = std::abs(std::sin(_frameNumber / 120.f));
     clearValue = { {0.0f,0.f,flash,1.f} };
@@ -1593,6 +1598,7 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
+    OPTICK_EVENT();
     _renderTimeTimer->Start();
 
     std::vector<uint32_t> opaqueDraws;
@@ -1854,6 +1860,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
 {
+    OPTICK_EVENT();
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingAttachmentInfo depthAttachment =
