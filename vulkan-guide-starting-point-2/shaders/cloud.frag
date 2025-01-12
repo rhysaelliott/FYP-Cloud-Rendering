@@ -12,7 +12,7 @@ layout(set=2, binding=0) uniform VoxelInfo
 
 	vec2 screenRes;
 	float outScatterMultiplier;
-
+	float time;
 
 } voxelInfo;
 
@@ -84,7 +84,7 @@ void main()
 	while(tMin<=stepMax &&I<0.8&&transmit>0.1)
 	{
 		tMin+=stepSize;
-		float jitter =(random(gl_FragCoord.xy) - 0.5) * stepSize;
+		float jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
 		tMin += jitter;
 		vec3 samplePos = rayOrigin+ (rayDir*tMin);
 

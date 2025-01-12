@@ -237,7 +237,7 @@ struct GPUVoxelBuffer
 
 
 	float outScatterMultiplier;
-	float padding;
+	float time;
 
 	GPUVoxelBuffer()
 	{

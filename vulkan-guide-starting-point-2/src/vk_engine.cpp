@@ -1408,6 +1408,7 @@ void VulkanEngine::update_volumetrics()
     OPTICK_EVENT();
     _voxelGenInfo.time = _voxelGenTimer->GetTotalElapsed() ;
     
+    _cloudVoxels.GPUVoxelInfo.time = _voxelGenTimer->GetTotalElapsed();
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
