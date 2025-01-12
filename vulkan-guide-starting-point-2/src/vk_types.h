@@ -235,21 +235,14 @@ struct GPUVoxelBuffer
 	glm::vec4 bounds;
 	glm::vec2 screenResolution;
 
-	float stepSize;
-	float stepMax;
 
-	float sunStepSize;
-	float sunStepMax;
 	float outScatterMultiplier;
 	float padding;
 
 	GPUVoxelBuffer()
 	{
-		stepSize = 1.0f;
-		stepMax = 128.f;
-		sunStepSize = 5.f;
-		sunStepMax = 50.f;
-		outScatterMultiplier = 0.005f;
+
+		outScatterMultiplier = 0.03f;
 	}
 };
 

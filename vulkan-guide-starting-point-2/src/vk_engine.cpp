@@ -922,7 +922,7 @@ void VulkanEngine::init_default_data()
 
     sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
 
-    sceneData.sunlightDirection = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+    sceneData.sunlightDirection = glm::vec4(0.5f, 0.5f, -0.85f, 1.0f);
 
 
     _renderTimeTimer = new Timer("Render Time");
@@ -2119,7 +2119,7 @@ void VulkanEngine::run()
                     ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.15f");
                     ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed,  0.f, 100.f, "%.15f");
 
-                    ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.05f, .5f, "%.05f");
+                    ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.01f, 0.5f, "%.05f");
 
 
                     ImGui::EndTabItem();
