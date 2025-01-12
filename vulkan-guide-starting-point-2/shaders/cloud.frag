@@ -77,7 +77,7 @@ void main()
 
 	float accumulatedDensity=0.0;
 
-	while(tMin<=voxelInfo.stepMax &&accumulatedDensity<1.0 )
+	while(tMin<=voxelInfo.stepMax &&accumulatedDensity<0.5)
 	{
 		tMin+=voxelInfo.stepSize;
 		float jitter =(random(gl_FragCoord.xy) - 0.5) * voxelInfo.stepSize;

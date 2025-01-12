@@ -961,7 +961,7 @@ void VulkanEngine::init_volumetric_data()
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
     obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(50, 50, 50));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(100, 100, 100));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -973,15 +973,15 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 128;
-    imageSize.height = 128;
-    imageSize.depth = 128;
+    imageSize.width = 256;
+    imageSize.height = 256;
+    imageSize.depth = 256;
 
   
 
     _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
-    const char* fileName = "..\\..\\assets\\noiseShape.tga";
+    const char* fileName = "..\\..\\assets\\noiseShapePacked.tga";
     int width, height, channels;
     unsigned char* data = stbi_load(fileName, &width, &height, &channels, 0);
 
@@ -991,7 +991,7 @@ void VulkanEngine::init_volumetric_data()
 
     _cloudShapeNoiseImage = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 
-     fileName = "..\\..\\assets\\noiseErosion.tga";
+     fileName = "..\\..\\assets\\noiseErosionPacked.tga";
     data = stbi_load(fileName, &width, &height, &channels, 0);
 
     imageSize.width = height;
@@ -1588,7 +1588,7 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width+7.0  / 8.0), std::ceil(_cloudVoxelImage.imageExtent.height + 7.0 / 8.0), std::ceil(_cloudVoxelImage.imageExtent.depth + 7.0 / 8.0));
+    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width+1  / 2), std::ceil(_cloudVoxelImage.imageExtent.height + 1 / 2), std::ceil(_cloudVoxelImage.imageExtent.depth + 1 / 2));
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuVoxelGenBuffer);
@@ -1863,12 +1863,9 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
     OPTICK_EVENT();
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depthAttachment =
-        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
 
     VkRenderingInfo renderInfo =
-        vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
+        vkinit::rendering_info(_drawExtent, &colorAttachment, nullptr);
     vkCmdBeginRendering(cmd, &renderInfo);
 
     //handle scene data
@@ -1986,6 +1983,7 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
 {
+    OPTICK_EVENT();
     VkRenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingInfo renderInfo =
@@ -2120,12 +2118,6 @@ void VulkanEngine::run()
                     ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.f, 1.f, "%.15f");
                     ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.15f");
                     ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed,  0.f, 100.f, "%.15f");
-
-                    ImGui::SliderFloat("Step Size", &_cloudVoxels.GPUVoxelInfo.stepSize, 0.2f, 20.f, "%.15f");
-                    ImGui::SliderFloat("Step Max", &_cloudVoxels.GPUVoxelInfo.stepMax, 1.f, 240.f, "%.15f");
-
-                    ImGui::SliderFloat("Sun Step Size", &_cloudVoxels.GPUVoxelInfo.sunStepSize, 0.1f, 10.f, "%.15f");
-                    ImGui::SliderFloat("Sun Step Max", &_cloudVoxels.GPUVoxelInfo.sunStepMax, 1.f, 50.f, "%.15f");
 
                     ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.05f, .5f, "%.05f");
 

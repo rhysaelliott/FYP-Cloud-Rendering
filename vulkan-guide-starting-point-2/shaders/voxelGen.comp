@@ -1,6 +1,6 @@
 #version 460
 
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+layout (local_size_x = 2, local_size_y = 2, local_size_z = 2) in;
 
 layout(r8, binding = 0) uniform image3D densityTex;
 
@@ -59,7 +59,6 @@ void main()
     float density = cloudDensity - detailFbm * pow(1-fbm,3) * voxelGenInfo.detailNoiseMultiplier;
 
     density*=voxelGenInfo.densityMultiplier;
-
     imageStore(densityTex, pos, vec4(density,0,0,0));
 
 
