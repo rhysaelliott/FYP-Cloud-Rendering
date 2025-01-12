@@ -118,7 +118,7 @@ void main()
 						sunTransmit *= beer(sunDensity * (1-voxelInfo.outScatterMultiplier));
 			}
 
-			I+= density * transmit * phase * sunTransmit ;
+			I+= density * transmit * phase * sunTransmit * powder(density);
 			transmit*= (beer(density)+powder(density)) * (1- voxelInfo.outScatterMultiplier);
 		}
 	}
