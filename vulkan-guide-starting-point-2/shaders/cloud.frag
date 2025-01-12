@@ -78,7 +78,7 @@ void main()
 	float stepSize = 2.0;
 	float stepMax = 128.0;
 	float sunStepSize = 5.0;
-	float sunStepMax = 0.0;
+	float sunStepMax = 50.0;
 
 
 	while(tMin<=stepMax &&I<0.8&&transmit>0.1)
@@ -99,8 +99,7 @@ void main()
 
 		if(density>0.0)
 		{
-
-			while(sunTMin<sunStepMax && sunAccumulatedDensity<0.8)
+			while(sunTMin<sunStepMax && sunAccumulatedDensity<0.8 && sunTransmit>0.1)
 			{
 				vec3 sunSamplePos = samplePos+ (toSun*sunTMin);
 				sunTMin+=sunStepSize + jitter;
@@ -115,7 +114,8 @@ void main()
 						float sunDensity = vec3(texture(voxelBuffer, uvw)).r*sunStepSize;
 
 						sunAccumulatedDensity+=sunDensity;
-						sunTransmit *= beer(sunDensity * (1-voxelInfo.outScatterMultiplier));
+						
+						sunTransmit *= (beer(sunDensity)+powder(sunDensity)) * (1-voxelInfo.outScatterMultiplier);
 			}
 
 			I+= density * transmit * phase * sunTransmit * powder(density);
