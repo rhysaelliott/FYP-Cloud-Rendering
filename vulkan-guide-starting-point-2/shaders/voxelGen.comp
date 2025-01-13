@@ -20,7 +20,7 @@ layout(binding=3) uniform VoxelGenInfo
     float cloudSpeed;
     float detailSpeed;
     float time;
-    float padding;
+    int reprojection;
 } voxelGenInfo;
 
 float beer(float d)
@@ -37,8 +37,18 @@ float heightMap(float h)
 void main() 
 {
     ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
-    vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
     
+    //todo if nPos is to be updated this frame, do full calculation. if not, get previous and store
+
+    float density =0.0;
+
+    if((pos.x+pos.y+pos.z)%400 != voxelGenInfo.reprojection)
+    {
+        density = imageLoad(densityTex, pos).r;
+    }
+    else
+    {
+    vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
     float height = nPos.y;
 
     vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
@@ -56,10 +66,12 @@ void main()
 
     float cloudDensity =fbm ;
 
-    float density = cloudDensity - detailFbm * pow(1-fbm,3) * voxelGenInfo.detailNoiseMultiplier;
+    density = cloudDensity - detailFbm * pow(1-fbm,3) * voxelGenInfo.detailNoiseMultiplier;
 
     density*=voxelGenInfo.densityMultiplier;
+    
     imageStore(densityTex, pos, vec4(density,0,0,0));
+    }
 
 
 }

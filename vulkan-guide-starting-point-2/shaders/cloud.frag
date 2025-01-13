@@ -76,7 +76,7 @@ void main()
 	float sunTransmit =1.0;
 	
 	float stepSize = 2.0;
-	float stepMax = 128.0;
+	float stepMax = 256.0;
 	float sunStepSize = 5.0;
 	float sunStepMax = 50.0;
 

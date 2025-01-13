@@ -259,7 +259,7 @@ struct GPUVoxelGenBuffer
 	float cloudSpeed;
 	float detailSpeed;
 	float time;
-	float padding;
+	unsigned int reprojection;
 
 	GPUVoxelGenBuffer()
 	{
@@ -273,6 +273,7 @@ struct GPUVoxelGenBuffer
 		cloudSpeed = 0.8f;
 		detailSpeed = 15.f;
 		time = 0.f;
+		reprojection = 0;
 	}
 };
 

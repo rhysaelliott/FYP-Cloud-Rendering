@@ -1412,9 +1412,7 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    //todo update time here
-
-
+    _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection >= 399) ? 0 : _voxelGenInfo.reprojection+=1;
 }
 
 void VulkanEngine::update_billboards()
@@ -1561,11 +1559,6 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 {
     OPTICK_EVENT();
-    VkClearColorValue clearValue;
-    float flash = std::abs(std::sin(_frameNumber / 120.f));
-    clearValue = { {0.0f,0.f,flash,1.f} };
-
-    VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
 
