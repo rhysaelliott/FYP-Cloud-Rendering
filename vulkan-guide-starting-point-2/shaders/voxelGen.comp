@@ -1,6 +1,6 @@
 #version 460
 
-layout (local_size_x = 2, local_size_y = 2, local_size_z = 2) in;
+layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(r8, binding = 0) uniform image3D densityTex;
 
@@ -42,12 +42,12 @@ void main()
 
     float density =0.0;
 
-    if((pos.x+pos.y+pos.z)%400 != voxelGenInfo.reprojection)
-    {
-        density = imageLoad(densityTex, pos).r;
-    }
-    else
-    {
+   // if((pos.x+pos.y+pos.z)%1 != voxelGenInfo.reprojection)
+   // {
+    //    density = imageLoad(densityTex, pos).r;
+    //}
+   // else
+   // {
     vec3 nPos = vec3(pos) / vec3(imageSize(densityTex));
     float height = nPos.y;
 
@@ -71,7 +71,7 @@ void main()
     density*=voxelGenInfo.densityMultiplier;
     
     imageStore(densityTex, pos, vec4(density,0,0,0));
-    }
+   // }
 
 
 }

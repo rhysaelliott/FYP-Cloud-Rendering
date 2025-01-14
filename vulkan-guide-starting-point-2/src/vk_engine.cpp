@@ -1412,7 +1412,7 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection >= 399) ? 0 : _voxelGenInfo.reprojection+=1;
+    _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection >= 999) ? 0 : _voxelGenInfo.reprojection+=1;
 }
 
 void VulkanEngine::update_billboards()
@@ -1582,7 +1582,7 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width+1  / 2), std::ceil(_cloudVoxelImage.imageExtent.height + 1 / 2), std::ceil(_cloudVoxelImage.imageExtent.depth + 1 / 2));
+    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width  ), std::ceil(_cloudVoxelImage.imageExtent.height ), std::ceil(_cloudVoxelImage.imageExtent.depth ));
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuVoxelGenBuffer);
