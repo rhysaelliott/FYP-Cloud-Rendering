@@ -9,7 +9,7 @@ class Timer
 public:
 	//constructor (with name of whats being tracked)
 
-	Timer(std::string timerName) { name = timerName; callCount = 0; totalElapsed = 500.f; }
+	Timer(std::string timerName) { name = timerName; callCount = 0; totalElapsed = 50.f; }
 	~Timer() {
 	};
 	void Start()
@@ -34,7 +34,7 @@ public:
 	float GetTotalElapsed()
 	{
 
-		return fmod(totalElapsed,1000.f)/1000.f;
+		return fmod(totalElapsed,100.f)/100.f;
 	}
 
 private:
