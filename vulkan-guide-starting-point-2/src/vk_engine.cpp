@@ -125,12 +125,12 @@ void VulkanEngine::init()
 
     init_imgui();
 
-    std::string structurePath = { "..\\..\\assets\\basicmesh.glb" };
+    std::string structurePath = { "..\\..\\assets\\structure.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
 
-    //loadedScenes["structure"] = *structureFile;
+    loadedScenes["structure"] = *structureFile;
 
     // everything went fine
     _isInitialized = true;
@@ -895,28 +895,8 @@ void VulkanEngine::init_default_data()
     mainCamera.position = glm::vec3(30.f, -0.f, -85.f);
 
     mainCamera.pitch = 0;
-    mainCamera.yaw = 0;
+    mainCamera.yaw = 90;
 
-    LightStruct light1 = {};
-    light1.color = glm::vec3 (1.5f, 0.f, 0.f);
-    light1.position = glm::vec3(30.f, -0, -85.f);
-    light1.range = 15.f;
-    light1.constant = 1.0f;
-    light1.linear = 0.1f;
-    light1.quadratic = 0.1f;
-    light1.intensity = 10;
-
-    LightStruct light2 = {};
-    light2.color = glm::vec3(0.0f, 0.0f, 1.0f);
-    light2.position = glm::vec3(20.f, -0, -85.f);
-    light2.range = 15.f;
-    light2.constant = 1.0f;
-    light2.linear = 0.1f;
-    light2.quadratic = 0.1f;
-    light2.intensity = 10;
-
-    sceneLights.push_back(light1);
-    sceneLights.push_back(light2);
 
     sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
 
@@ -1382,7 +1362,7 @@ void VulkanEngine::update_scene()
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
 
-   // loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    //loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -1925,8 +1905,6 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
                 }
 
 
-
-            
                     draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
                     DescriptorWriter writer;
                     writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -1950,9 +1928,9 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
             pushConstants.worldMatrix = draw.transform;
             vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
-   
-                vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
-            
+
+            vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+
 
             stats.drawcallCount++;
             stats.triangleCount += draw.indexCount / 3;

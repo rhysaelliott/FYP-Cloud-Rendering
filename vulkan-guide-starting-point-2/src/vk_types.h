@@ -269,7 +269,7 @@ struct GPUVoxelGenBuffer
 		detailNoiseMultiplier = 1.f;
 		detailNoiseScale = 0.8f;
 
-		heightMapFactor = 0.25f;
+		heightMapFactor = 0.81f;
 		cloudSpeed = 0.8f;
 		detailSpeed = 15.f;
 		time = 0.f;
