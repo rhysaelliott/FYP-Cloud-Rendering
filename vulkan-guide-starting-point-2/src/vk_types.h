@@ -275,7 +275,7 @@ struct GPUVoxelGenBuffer
 
 		heightMapFactor = 0.81f;
 		cloudSpeed = 0.8f;
-		detailSpeed = 15.f;
+		detailSpeed = 3.f;
 		time = 0.f;
 		reprojection = 0;
 	}

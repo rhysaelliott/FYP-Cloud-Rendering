@@ -33,8 +33,7 @@ public:
 	}
 	float GetTotalElapsed()
 	{
-
-		return fmod(totalElapsed,100.f)/100.f;
+		return fmod(totalElapsed,200.f)/200.f;
 	}
 
 private:

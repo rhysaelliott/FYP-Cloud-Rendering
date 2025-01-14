@@ -50,8 +50,11 @@ void main()
     vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
     float edgeDistance = min(min(edgeProximity.x, edgeProximity.z),edgeProximity.y);
 
-    vec3 shapePos = nPos *(voxelGenInfo.time *voxelGenInfo.cloudSpeed);
-    vec3 noisePos = nPos* (voxelGenInfo.time*voxelGenInfo.detailSpeed) * voxelGenInfo.detailNoiseScale;
+    vec3 shapeOffset = vec3(voxelGenInfo.time * voxelGenInfo.cloudSpeed);
+    vec3 shapePos = nPos + shapeOffset;
+
+    vec3 noiseOffset = vec3(voxelGenInfo.time * voxelGenInfo.detailSpeed);
+    vec3 noisePos = nPos * voxelGenInfo.detailNoiseScale + noiseOffset;
 
     vec4 shapeNoise =texture(shapeNoiseTex, shapePos) ;
     vec4 detailNoise =texture(detailNoiseTex, noisePos) ;
