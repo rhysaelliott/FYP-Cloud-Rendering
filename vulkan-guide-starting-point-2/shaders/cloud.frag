@@ -14,6 +14,9 @@ layout(set=2, binding=0) uniform VoxelInfo
 	float outScatterMultiplier;
 	float time;
 
+	float silverIntensity;
+	float silverSpread;
+
 } voxelInfo;
 
 layout(location =0) in vec3 inPos;
@@ -43,7 +46,8 @@ float random(vec2 uv) {
 
 float HenyeyGreenstein(float angle, float g)
 {
-	return (1.0f - pow(g,2)) / (4.0f * 3.14159 * pow(1 + pow(g, 2) - 2.0f * g * angle, 1.5f));
+	//return (1.0f - pow(g,2)) / (4.0f * 3.14159 * pow(1 + pow(g, 2) - 2.0f * g * angle, 1.5f));
+	return ((1.0-g)/ pow((1.0+g*g-2.0*g*angle),3.0/2.0))/4.0*3.1459;
 }
 
 void main()
@@ -67,8 +71,10 @@ void main()
 	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
 	vec3 toSun = -sunlightDir;
 
-	float cosAngle = dot(rayDir,toSun);
-	float phase = HenyeyGreenstein(1, cosAngle) + HenyeyGreenstein(-1,cosAngle)/2.0 ;
+	float cosAngle = cos(dot(toSun,rayDir));
+	float eccentricity=0.99;
+
+	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
 
 
 	float I =0.0; //illumination
@@ -117,9 +123,8 @@ void main()
 						
 						sunTransmit *= (beer(sunDensity)+powder(sunDensity)) * (1-voxelInfo.outScatterMultiplier);
 			}
-
-			I+= density * transmit * phase * sunTransmit * powder(density);
-			transmit*= (beer(density)+powder(density)) * (1- voxelInfo.outScatterMultiplier);
+			transmit*= max((beer(density)+powder(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier);
+			I+= transmit * phase * sunTransmit * powder(density);
 		}
 	}
 

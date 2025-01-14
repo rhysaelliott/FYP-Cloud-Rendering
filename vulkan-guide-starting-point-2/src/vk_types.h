@@ -233,16 +233,20 @@ struct GPUVoxelBuffer
 {
 	glm::vec4 centrePos;
 	glm::vec4 bounds;
+
 	glm::vec2 screenResolution;
-
-
 	float outScatterMultiplier;
 	float time;
 
+	float silverIntensity;
+	float silverSpread;
+	float padding[2];
 	GPUVoxelBuffer()
 	{
 
-		outScatterMultiplier = 0.03f;
+		outScatterMultiplier = 0.8f;
+		silverIntensity = 0.8f;
+		silverSpread = 0.18f;
 	}
 };
 
@@ -263,9 +267,9 @@ struct GPUVoxelGenBuffer
 
 	GPUVoxelGenBuffer()
 	{
-		shapeNoiseWeights = glm::vec4(0.7f, 0.37f, 0.25f, 0.0f);
-		detailNoiseWeights = glm::vec4(.4f, .7f, .5f, .25f);
-		densityMultiplier = 0.1f;
+		shapeNoiseWeights = glm::vec4(0.93f, 0.5f, 0.25f, 0.04f);
+		detailNoiseWeights = glm::vec4(.47f, .54f, .55f, .2f);
+		densityMultiplier = 0.8f;
 		detailNoiseMultiplier = 1.f;
 		detailNoiseScale = 0.8f;
 

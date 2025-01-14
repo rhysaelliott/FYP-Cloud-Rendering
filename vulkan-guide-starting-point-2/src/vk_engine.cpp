@@ -2092,6 +2092,8 @@ void VulkanEngine::run()
                     ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed,  0.f, 100.f, "%.15f");
 
                     ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.01f, 0.5f, "%.05f");
+                    ImGui::SliderFloat("Silver Intensity", &_cloudVoxels.GPUVoxelInfo.silverIntensity, 0.01f, 1.5f, "%.05f");
+                    ImGui::SliderFloat("Silver Spread", &_cloudVoxels.GPUVoxelInfo.silverSpread, 0.01f, 1.5f, "%.05f");
 
 
                     ImGui::EndTabItem();
