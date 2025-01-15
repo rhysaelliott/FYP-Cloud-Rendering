@@ -1562,7 +1562,7 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdDispatch(cmd, std::ceil(_cloudVoxelImage.imageExtent.width  ), std::ceil(_cloudVoxelImage.imageExtent.height ), std::ceil(_cloudVoxelImage.imageExtent.depth ));
+    vkCmdDispatch(cmd, (_cloudVoxelImage.imageExtent.width -7 )/8, (_cloudVoxelImage.imageExtent.height-7 )/8, (_cloudVoxelImage.imageExtent.depth -7)/8);
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuVoxelGenBuffer);
