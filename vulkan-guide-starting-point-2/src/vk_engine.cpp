@@ -953,9 +953,9 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 256;
-    imageSize.height = 256;
-    imageSize.depth = 256;
+    imageSize.width = 512;
+    imageSize.height = 512;
+    imageSize.depth = 512;
 
   
 
@@ -1562,7 +1562,7 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdDispatch(cmd, (_cloudVoxelImage.imageExtent.width -7 )/8, (_cloudVoxelImage.imageExtent.height-7 )/8, (_cloudVoxelImage.imageExtent.depth -7)/8);
+    vkCmdDispatch(cmd, std::ceil((_cloudVoxelImage.imageExtent.width -7 )/8), std::ceil((_cloudVoxelImage.imageExtent.height-7 )/8), std::ceil((_cloudVoxelImage.imageExtent.depth -7)/8));
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(gpuVoxelGenBuffer);
