@@ -902,7 +902,7 @@ void VulkanEngine::init_default_data()
 
     sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
 
-    sceneData.sunlightDirection = glm::vec4(0.5f, 0.5f, 0.55f, 1.0f);
+    sceneData.sunlightDirection = glm::vec4(-1.0f, 1.f, 0.f, 1.0f);
 
 
     _renderTimeTimer = new Timer("Render Time");
