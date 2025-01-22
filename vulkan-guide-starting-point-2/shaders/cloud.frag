@@ -70,7 +70,7 @@ void main()
 	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
 	vec3 toSun = -sunlightDir;
 
-	float cosAngle = cos(dot(toSun,rayDir));
+	float cosAngle = cos(dot(rayDir,toSun));
 	float eccentricity=0.99;
 
 	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
@@ -103,11 +103,12 @@ void main()
 
 		if(density>0.0)
 		{
-			while(sunTMin<sunStepMax && sunTransmit >0.2)
+			while(sunTMin<sunStepMax && sunTransmit >0.2 )
 			{
 				sunTMin+=sunStepSize;
 				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * sunStepSize;
-				vec3 sunSamplePos = (samplePos+jitter) + (toSun*sunTMin);
+				sunTMin+=jitter;
+				vec3 sunSamplePos = (samplePos) + (toSun*sunTMin);
 
 						if (!(sunSamplePos.x >= voxelGridMin.x && sunSamplePos.x <= voxelGridMax.x &&
             			sunSamplePos.y >= voxelGridMin.y && sunSamplePos.y <= voxelGridMax.y &&
@@ -118,19 +119,18 @@ void main()
 
 						float sunDensity = vec3(texture(voxelBuffer, uvw)).r*sunStepSize;
 
-						sunTransmit *= max((beer(sunDensity)), beer(sunDensity*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier);
+						sunTransmit *= max((beer(sunDensity) + powder(sunDensity)), beer(sunDensity*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier);
 						sunI+= sunTransmit*phase*powder(sunDensity);
 			}
-			transmit*= (max((beer(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier))*sunTransmit;
+			transmit*= (max((beer(density) + powder(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier))*sunTransmit;
 			I+=  transmit* phase * powder(density);
-			I+= max((sunI*0.15), 0.1);
+			I+=  max((sunI*0.2), 0.05);
 
 		}
 	}
 
 	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
 
-	//finalColor = max( vec3(0.3)*sunlightColor , finalColor);
 
 	outFragColor =vec4(finalColor , 1.0);
 }

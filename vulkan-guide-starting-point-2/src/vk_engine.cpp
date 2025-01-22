@@ -900,7 +900,7 @@ void VulkanEngine::init_default_data()
 
     sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
 
-    sceneData.sunlightColor = glm::vec4(1.0f, 0.8f, 0.6f, 1.0f);
+    sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
 
     sceneData.sunlightDirection = glm::vec4(-1.0f, 1.f, 0.f, 1.0f);
 
