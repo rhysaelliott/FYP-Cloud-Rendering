@@ -106,7 +106,7 @@ void main()
 			while(sunTMin<sunStepMax && sunTransmit >0.2 )
 			{
 				sunTMin+=sunStepSize;
-				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * sunStepSize;
+				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
 				sunTMin+=jitter;
 				vec3 sunSamplePos = (samplePos) + (toSun*sunTMin);
 
