@@ -86,7 +86,7 @@ void main()
 	float transmit = 1.0;
 	float sunTransmit =1.0;
 
-	while(tMin<=stepMax &&I<0.8 && transmit>0.1)
+	while(tMin<=stepMax &&I<0.7 && transmit>0.0)
 	{
 		tMin+=stepSize;
 		float jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
@@ -103,7 +103,7 @@ void main()
 
 		if(density>0.0)
 		{
-			while(sunTMin<sunStepMax && sunTransmit >0.2 )
+			while(sunTMin<sunStepMax && sunTransmit >0.0 && sunI<1.0 )
 			{
 				sunTMin+=sunStepSize;
 				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
@@ -119,12 +119,14 @@ void main()
 
 						float sunDensity = vec3(texture(voxelBuffer, uvw)).r*sunStepSize;
 
-						sunTransmit *= max((beer(sunDensity) + powder(sunDensity)), beer(sunDensity*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier);
-						sunI+= sunTransmit*phase*powder(sunDensity);
+						sunTransmit *= beer(sunDensity) ;
+						sunI+= sunTransmit * powder(sunDensity) * phase;
 			}
-			transmit*= (max((beer(density) + powder(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier))*sunTransmit;
+
 			I+=  transmit* phase * powder(density);
-			I+=  max((sunI*0.2), 0.05);
+			I+=  max((sunI*0.15), 0.05);
+			transmit*= (max((beer(density) + powder(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier));
+			transmit*=sunTransmit;
 
 		}
 	}
