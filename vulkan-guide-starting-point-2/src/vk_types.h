@@ -244,7 +244,7 @@ struct GPUVoxelBuffer
 	GPUVoxelBuffer()
 	{
 
-		outScatterMultiplier = 0.25f;
+		outScatterMultiplier = 0.17f;
 		silverIntensity = 0.8f;
 		silverSpread = 0.18f;
 	}

@@ -103,7 +103,7 @@ void main()
 
 		if(density>0.0)
 		{
-			while(sunTMin<sunStepMax && sunTransmit >0.0 && sunI<1.0 )
+			while(sunTMin<sunStepMax && sunTransmit >0.0  )
 			{
 				sunTMin+=sunStepSize;
 				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
@@ -124,9 +124,9 @@ void main()
 			}
 
 			I+=  transmit* phase * powder(density);
-			I+=  max((sunI*0.15), 0.05);
+			I+=  max((sunI*0.05), 0.001);
 			transmit*= (max((beer(density) + powder(density)), beer(density*0.25)*0.7) * (1- voxelInfo.outScatterMultiplier));
-			transmit*=sunTransmit;
+			transmit*=(sunTransmit);
 
 		}
 	}
