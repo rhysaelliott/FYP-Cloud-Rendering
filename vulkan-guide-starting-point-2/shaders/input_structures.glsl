@@ -40,11 +40,13 @@ struct LightStruct
     uint lightType; 
 };
 
+#define NUM_OF_BILLBOARDS 128
+
 layout(set=2, binding= 0) uniform BillboardData
 {
-	vec4 position[128];
-    vec4 scale[32];   
-    vec4 texIndex[32]; 
+	vec4 position[NUM_OF_BILLBOARDS];
+    vec4 scale[NUM_OF_BILLBOARDS/4];   
+    vec4 texIndex[NUM_OF_BILLBOARDS/4]; 
 
 } billboardData;
 

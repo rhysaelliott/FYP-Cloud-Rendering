@@ -1029,15 +1029,15 @@ void VulkanEngine::init_billboard_data()
     };
     GPUMeshBuffers mesh = upload_mesh(indices, vertices);
 
-    RenderObject obj;
     _billboardTransparencyType=0;
     _billboardMaterial.passType = MaterialPass::Billboard;
     _billboardMaterial.pipeline = &_billboardPipeline[0];
     
 
 
+    RenderObject obj;
     obj.indexCount = indices.size();
-    obj.instanceCount = 128;
+    obj.instanceCount = NUM_OF_BILLBOARDS;
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_billboardMaterial;
@@ -1046,17 +1046,21 @@ void VulkanEngine::init_billboard_data()
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
-    mainDrawContext.BillboardSurfaces.push_back(obj);
-
+    for (int i = 0; i < 1; i++)
+    {
+        mainDrawContext.BillboardSurfaces.push_back(obj);
+    }
 
     for (int i = 0; i < obj.instanceCount; i++)
     {
-        _billboardData.billboardPos[i] =glm::vec4(rand()%(101), rand() % (101), rand() % (101), 0);
+        _billboardData.billboardPos[i] = glm::vec4(rand() % (101), rand() % (101), rand() % (101), 0);
 
-        _billboardData.scale[i/4][i%4] = 10.0f;
+        _billboardData.scale[i / 4][i % 4] = 10.0f;
 
-        _billboardData.texIndex[i/4][i%4] = rand() % (10);
+        _billboardData.texIndex[i / 4][i % 4] = rand() % (10);
     }
+    
+
 
     _mainDeletionQueue.push_function([&]() {
         
@@ -1605,7 +1609,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     if (_billboardTransparencyType == 0)
     {
-        for (int i = 0; i < 128; i++)
+        for (int i = 0; i < NUM_OF_BILLBOARDS; i++)
         {
             float distance = glm::length(mainCamera.position - glm::vec3(_billboardData.billboardPos[i].x, _billboardData.billboardPos[i].y, _billboardData.billboardPos[i].z));
             cloudInstances.push_back({ distance,i });
@@ -1614,7 +1618,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
         std::sort(cloudInstances.begin(), cloudInstances.end(), [](CloudInstance& a, CloudInstance& b) {
             return a.distance > b.distance;
             });
-        for (int i = 0; i < 128; i++)
+        for (int i = 0; i < NUM_OF_BILLBOARDS; i++)
         {
             int sortedIndex = cloudInstances[i].index;
 
@@ -1784,7 +1788,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
             if (draw.material->passType == MaterialPass::Billboard)
             {
-                vkCmdDrawIndexed(cmd, draw.indexCount, 128, draw.firstIndex, 0, 0);
+                vkCmdDrawIndexed(cmd, draw.indexCount, NUM_OF_BILLBOARDS, draw.firstIndex, 0, 0);
             }
             else
             {
@@ -2163,8 +2167,9 @@ void VulkanEngine::cleanup()
             destroy_buffer(mainDrawContext.VolumetricSurfaces[i].meshBuffer.vertexBuffer);
         }
 
-        for (int i = 0; i < mainDrawContext.BillboardSurfaces.size(); i++)
+        for (int i = 0; i < 1; i++)
         {
+
             destroy_buffer(mainDrawContext.BillboardSurfaces[i].meshBuffer.indexBuffer);
             destroy_buffer(mainDrawContext.BillboardSurfaces[i].meshBuffer.vertexBuffer);
 

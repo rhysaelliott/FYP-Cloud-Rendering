@@ -58,11 +58,13 @@ struct CloudInstance
 	int index;
 };
 
+#define NUM_OF_BILLBOARDS 128
+
 struct BillboardData
 {
-	glm::vec4 billboardPos[128];
-	glm::vec4 scale[32];
-	glm::vec4 texIndex[32];
+	glm::vec4 billboardPos[NUM_OF_BILLBOARDS];
+	glm::vec4 scale[NUM_OF_BILLBOARDS/4];
+	glm::vec4 texIndex[NUM_OF_BILLBOARDS/4];
 };
 
 
