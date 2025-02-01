@@ -86,6 +86,7 @@ bool is_light_affecting_object(const LightStruct& light, const RenderObject& obj
 VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
 void VulkanEngine::init()
 {
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
     // only one engine initialization is allowed with the application.
     assert(loadedEngine == nullptr);
     loadedEngine = this;
@@ -93,7 +94,6 @@ void VulkanEngine::init()
     // We initialize SDL and create a window with it.
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
     _window = SDL_CreateWindow(
         "Vulkan Engine",
@@ -1420,18 +1420,21 @@ void VulkanEngine::draw()
     //wait for gpu to render last frame
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
 
+
     get_current_frame()._deletionQueue.flush();
     get_current_frame()._frameDescriptors.clear_descriptors(_device);
 
-    VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
-
     uint32_t swapchainImageIndex;
     VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex);
-    if (e == VK_ERROR_OUT_OF_DATE_KHR)
+    if (e == VK_ERROR_OUT_OF_DATE_KHR || e == VK_SUBOPTIMAL_KHR)
     {
         resize_requested = true;
         return;
     }
+
+
+    VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
+
 
     VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
@@ -1452,7 +1455,7 @@ void VulkanEngine::draw()
 
     vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    draw_voxel_grid(cmd);
+    //draw_voxel_grid(cmd);
 
     vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
@@ -1467,11 +1470,11 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     vkutil::copy_image_to_image(cmd, _drawImage.image, _backgroundImage.image, _drawExtent, _drawExtent);
-    //todo transition background image  change background image usage bits
+
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    draw_volumetrics(cmd);
+    //draw_volumetrics(cmd);
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1498,8 +1501,11 @@ void VulkanEngine::draw()
     VkSubmitInfo2 submit =
         vkinit::submit_info(&cmdInfo, &signalInfo, &waitInfo);
 
-    VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
+    {
+        OPTICK_EVENT("vk queue submit");
+        VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
 
+    }
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.pNext = nullptr;
@@ -1510,11 +1516,15 @@ void VulkanEngine::draw()
     presentInfo.waitSemaphoreCount = 1;
 
     presentInfo.pImageIndices = &swapchainImageIndex;
-
-    VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
-    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR)
+    VkResult presentResult;
     {
-        resize_requested = true;
+        OPTICK_EVENT("present");
+        presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
+
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
+        {
+            resize_requested = true;
+        }
     }
 
     _frameNumber++;
@@ -2070,6 +2080,8 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
+                int bleh[2] = { _windowExtent.width, _windowExtent.height };
+                ImGui::DragInt2("window", bleh);
                 if (ImGui::BeginTabItem("clouds"))
                 {
                     ImGui::Text("General");
