@@ -2080,8 +2080,6 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
-                int bleh[2] = { _windowExtent.width, _windowExtent.height };
-                ImGui::DragInt2("window", bleh);
                 if (ImGui::BeginTabItem("clouds"))
                 {
                     ImGui::Text("General");
