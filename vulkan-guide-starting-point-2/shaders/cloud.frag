@@ -75,10 +75,10 @@ void main()
 
 	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
 	
-	float stepSize = 2.0;
-	float stepMax = 256.0;
-	float sunStepSize = 10.0;
-	float sunStepMax = 50.0;
+	float stepSize = 1.0;
+	float stepMax = 512.0;
+	float sunStepSize = 1.0;
+	float sunStepMax = 512.0;
 
 
 	float I =0.0; //illumination
@@ -99,7 +99,7 @@ void main()
         
 		vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
 		uvw = clamp(uvw, vec3(0),vec3(1));
-		float density =vec3(texture(voxelBuffer, uvw)).r * stepSize;
+		float density =vec3(texture(voxelBuffer, uvw)).r * 2.0;
 
 		if(density>0.0)
 		{

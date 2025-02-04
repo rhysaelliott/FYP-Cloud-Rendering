@@ -26,7 +26,7 @@
 
 VulkanEngine* loadedEngine = nullptr;
 
-constexpr bool bUseValidationLayers = true;
+constexpr bool bUseValidationLayers = false;
 
 bool is_visible(const RenderObject& obj, const glm::mat4& viewproj)
 {
@@ -209,8 +209,8 @@ void VulkanEngine::init_swapchain()
 
     VkExtent3D drawImageExtent =
     {
-        _windowExtent.width,
-        _windowExtent.height,
+        _windowExtent.width*2,
+        _windowExtent.height*2,
         1
     };
 
@@ -1164,6 +1164,8 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
 
     _swapchainExtent = vkbSwapchain.extent;
 
+    _swapchainExtent.height;
+    _swapchainExtent.width;
     _swapchain = vkbSwapchain.swapchain;
     _swapchainImages = vkbSwapchain.get_images().value();
     _swapchainImageViews = vkbSwapchain.get_image_views().value();
@@ -1177,8 +1179,8 @@ void VulkanEngine::resize_swapchain()
 
     int w, h;
     SDL_GetWindowSize(_window, &w, &h);
-    _windowExtent.width = w;
-    _windowExtent.height = h;
+    _windowExtent.width = w*2;
+    _windowExtent.height = h*2;
 
     create_swapchain(_windowExtent.width, _windowExtent.height);
 
@@ -1417,6 +1419,7 @@ void VulkanEngine::draw()
     OPTICK_EVENT();
     update_scene();
 
+
     //wait for gpu to render last frame
     VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
 
@@ -1443,8 +1446,8 @@ void VulkanEngine::draw()
     VkCommandBufferBeginInfo cmdBeginInfo =
         vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    _drawExtent.width = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
-    _drawExtent.height = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
+    _drawExtent.width =  _drawImage.imageExtent.width * renderScale;
+    _drawExtent.height =_drawImage.imageExtent.height * renderScale;
 
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
@@ -1455,14 +1458,14 @@ void VulkanEngine::draw()
 
     vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    //draw_voxel_grid(cmd);
+    draw_voxel_grid(cmd);
 
     vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    draw_geometry(cmd);
+    //draw_geometry(cmd);
 
     //use background image to draw volumetrics
 
@@ -1474,7 +1477,7 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    //draw_volumetrics(cmd);
+    draw_volumetrics(cmd);
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -2080,6 +2083,7 @@ void VulkanEngine::run()
         {
             if (ImGui::BeginTabBar("debugging"))
             {
+                ImGui::DragFloat("Render Scale", &renderScale);
                 if (ImGui::BeginTabItem("clouds"))
                 {
                     ImGui::Text("General");

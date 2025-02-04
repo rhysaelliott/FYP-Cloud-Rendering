@@ -22,10 +22,12 @@ void main()
     vec4 topColor = PushConstants.data1;
     vec4 bottomColor = PushConstants.data2;
 
+    topColor = pow(topColor,vec4(2.2));
+    bottomColor = pow(bottomColor,vec4(2.2));
     if(texelCoord.x < size.x && texelCoord.y < size.y)
     {
         float blend = float(texelCoord.y)/(size.y); 
-    
+
         imageStore(image, texelCoord, mix(topColor,bottomColor, blend));
     }
 }
