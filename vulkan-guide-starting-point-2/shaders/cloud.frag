@@ -49,6 +49,7 @@ float HenyeyGreenstein(float angle, float g)
 	return ((1.0-g)/ pow((1.0+g*g-2.0*g*angle),3.0/2.0))/4.0*3.1459;
 }
 
+
 void main()
 {
 	float tMin=0;
@@ -75,9 +76,9 @@ void main()
 
 	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
 	
-	float stepSize = 1.0;
+	float stepSize = 2.5;
 	float stepMax = 512.0;
-	float sunStepSize = 1.0;
+	float sunStepSize = 5.0;
 	float sunStepMax = 512.0;
 
 
@@ -86,10 +87,10 @@ void main()
 	float transmit = 1.0;
 	float sunTransmit =1.0;
 
-	while(tMin<=stepMax &&I<0.7 && transmit>0.0)
+	while(tMin<=stepMax &&I<1.0 && transmit>0.0)
 	{
 		tMin+=stepSize;
-		float jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
+		float jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * 0.5;
 		tMin += jitter;
 		vec3 samplePos = rayOrigin+ (rayDir*tMin);
 
@@ -106,7 +107,7 @@ void main()
 			while(sunTMin<sunStepMax && sunTransmit >0.0  )
 			{
 				sunTMin+=sunStepSize;
-				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * stepSize;
+				jitter =(random((gl_FragCoord.xy)*voxelInfo.time - 0.5)) * 0.5;
 				sunTMin+=jitter;
 				vec3 sunSamplePos = (samplePos) + (toSun*sunTMin);
 
@@ -132,7 +133,6 @@ void main()
 	}
 
 	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
-
 
 	outFragColor =vec4(finalColor , 1.0);
 }

@@ -209,8 +209,8 @@ void VulkanEngine::init_swapchain()
 
     VkExtent3D drawImageExtent =
     {
-        _windowExtent.width*2,
-        _windowExtent.height*2,
+        _windowExtent.width,
+        _windowExtent.height,
         1
     };
 
@@ -1179,8 +1179,8 @@ void VulkanEngine::resize_swapchain()
 
     int w, h;
     SDL_GetWindowSize(_window, &w, &h);
-    _windowExtent.width = w*2;
-    _windowExtent.height = h*2;
+    _windowExtent.width = w;
+    _windowExtent.height = h;
 
     create_swapchain(_windowExtent.width, _windowExtent.height);
 
