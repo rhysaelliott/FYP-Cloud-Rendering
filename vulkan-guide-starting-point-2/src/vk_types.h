@@ -229,6 +229,8 @@ struct MeshNode : public Node {
 	virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
+
+
 struct GPUVoxelBuffer
 {
 	glm::vec4 centrePos;
@@ -240,13 +242,18 @@ struct GPUVoxelBuffer
 
 	float silverIntensity;
 	float silverSpread;
-	float padding[2];
+	int reprojection;
+	float padding[1];
+
+	glm::mat4 prevViewProj;
+
 	GPUVoxelBuffer()
 	{
 
 		outScatterMultiplier = 0.17f;
 		silverIntensity = 1.0f;
 		silverSpread = 0.27f;
+		reprojection = 0;
 	}
 };
 
@@ -263,7 +270,7 @@ struct GPUVoxelGenBuffer
 	float cloudSpeed;
 	float detailSpeed;
 	float time;
-	unsigned int reprojection;
+	unsigned int padding;
 
 	GPUVoxelGenBuffer()
 	{
@@ -279,7 +286,6 @@ struct GPUVoxelGenBuffer
 		//detailSpeed = 0.f;
 		detailSpeed = 3.f;
 		time = 0.f;
-		reprojection = 0;
 	}
 };
 

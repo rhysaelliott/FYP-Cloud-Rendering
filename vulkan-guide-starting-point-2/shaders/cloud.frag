@@ -5,6 +5,8 @@
 
 layout(set =1, binding =10) uniform sampler3D voxelBuffer;
 layout(set =1, binding =11) uniform sampler2D backgroundTex;
+layout(set =1, binding =12) uniform sampler2D blueNoiseTex;
+layout(set =1, binding =13) uniform sampler2D previousFrameTex;
 layout(set=2, binding=0) uniform VoxelInfo
 {
 	vec4 centrePos;
@@ -16,8 +18,14 @@ layout(set=2, binding=0) uniform VoxelInfo
 
 	float silverIntensity;
 	float silverSpread;
+	int reprojection;
+
+	mat4 prevViewProj;
 
 } voxelInfo;
+
+
+
 
 layout(location =0) in vec3 inPos;
 layout (location =1) in vec3 rayOrigin;
@@ -51,6 +59,34 @@ float HenyeyGreenstein(float angle, float g)
 
 void main()
 {
+
+vec2 uv = gl_FragCoord.xy / voxelInfo.screenRes;
+vec2 ndc = uv * 2.0 - 1.0;
+
+vec4 currClipPos = vec4(ndc, 0.5, 1.0); 
+vec4 worldPos = inverse(sceneData.viewproj) * currClipPos;
+worldPos /= worldPos.w;
+
+vec3 rayDir = normalize(worldPos.xyz - rayOrigin); 
+
+
+float depth = 1000.0 ;
+vec3 samplePoint = rayOrigin + rayDir * depth;
+
+vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
+vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
+
+vec3 noise = texture(blueNoiseTex, fract(uv)).rgb; 
+
+int reprojection = int(floor(noise.r * 4.0));
+bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
+
+if(voxelInfo.reprojection!=reprojection && valid)
+{
+	outFragColor = texture(previousFrameTex, prevUV);
+	return;
+}
+
 	float tMin=0;
 	float sunTMin =0;
 	float sunAccumulatedDensity=0;
@@ -61,25 +97,25 @@ void main()
 	vec3 voxelGridMin = voxelGridCentre - voxelDimension*0.5;
 	vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
 
-	vec3 rayDir = normalize(inPos -rayOrigin);
+	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
 
-	vec2 backgroundUV = (gl_FragCoord).xy / voxelInfo.screenRes;
-	vec3 backgroundColor = texture(backgroundTex,backgroundUV).xyz;
 
 	vec3 sunlightColor = sceneData.sunlightColor.xyz;
-	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
+
 	vec3 toSun = -sunlightDir;
 
 	float cosAngle = cos(dot(rayDir,toSun));
 	float eccentricity=0.99;
 
+//TODO fix this for the horizon
 	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
 	
 	float stepSize = 2.0;
-	float stepMax = 256.0;
+	float stepMax = 512.0;
 	float sunStepSize = 10.0;
 	float sunStepMax = 50.0;
 
+	vec3 backgroundColor = texture(backgroundTex, uv).xyz;
 
 	float I =0.0; //illumination
 	float sunI =0.0;
@@ -132,7 +168,6 @@ void main()
 	}
 
 	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
-
 
 	outFragColor =vec4(finalColor , 1.0);
 }

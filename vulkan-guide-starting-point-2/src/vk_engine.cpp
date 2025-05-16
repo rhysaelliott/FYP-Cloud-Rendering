@@ -214,6 +214,8 @@ void VulkanEngine::init_swapchain()
         1
     };
 
+    
+
     _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     _drawImage.imageExtent = drawImageExtent;
 
@@ -243,14 +245,13 @@ void VulkanEngine::init_swapchain()
 
     VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &_drawImage.imageView));
 
+
     //create background image
     VkImageUsageFlags backgroundImageUsages{};
     backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-
 
     VkImageCreateInfo bimg_info =
         vkinit::image_create_info(_backgroundImage.imageFormat, backgroundImageUsages, drawImageExtent);
@@ -260,6 +261,17 @@ void VulkanEngine::init_swapchain()
         vkinit::imageview_create_info(_backgroundImage.imageFormat, _backgroundImage.image, VK_IMAGE_VIEW_TYPE_2D);
 
     VK_CHECK(vkCreateImageView(_device, &bviewInfo, nullptr, &_backgroundImage.imageView));
+
+    _drawImageHistory.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    _drawImageHistory.imageExtent = drawImageExtent;
+
+    VkImageCreateInfo rimgHistory_info =
+        vkinit::image_create_info(_drawImageHistory.imageFormat, backgroundImageUsages, drawImageExtent);
+    vmaCreateImage(_allocator, &rimgHistory_info, &rimg_allocInfo, &_drawImageHistory.image, &_drawImageHistory.allocation, nullptr);
+
+    VkImageViewCreateInfo rviewHInfo =
+        vkinit::imageview_create_info(_drawImageHistory.imageFormat, _drawImageHistory.image, VK_IMAGE_VIEW_TYPE_2D);
+    VK_CHECK(vkCreateImageView(_device, &rviewHInfo, nullptr, &_drawImageHistory.imageView));
 
     //create depth image
     _depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
@@ -277,6 +289,7 @@ void VulkanEngine::init_swapchain()
 
     VK_CHECK(vkCreateImageView(_device, &dviewInfo, nullptr, &_depthImage.imageView));
 
+
     _mainDeletionQueue.push_function([=]()
         {
             vkDestroyImageView(_device, _drawImage.imageView, nullptr);
@@ -284,6 +297,9 @@ void VulkanEngine::init_swapchain()
 
             vkDestroyImageView(_device, _backgroundImage.imageView, nullptr);
             vmaDestroyImage(_allocator, _backgroundImage.image, _backgroundImage.allocation);
+
+            vkDestroyImageView(_device, _drawImageHistory.imageView, nullptr);
+            vmaDestroyImage(_allocator, _drawImageHistory.image, _drawImageHistory.allocation);
 
             vkDestroyImageView(_device, _depthImage.imageView, nullptr);
             vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
@@ -357,7 +373,7 @@ void VulkanEngine::init_descriptors()
             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,3},
             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,3},
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,3},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,4},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,6},
         };
 
         _frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
@@ -613,6 +629,9 @@ void VulkanEngine::init_volumetric_pipeline()
     DescriptorLayoutBuilder layoutBuilder;
     layoutBuilder.add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    layoutBuilder.add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
 
     _volumetricDescriptorLayout = layoutBuilder.build(_device,  VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -862,6 +881,22 @@ void VulkanEngine::init_default_data()
         }
     }
 
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load("..\\..\\assets\\blue_noise.png", &width, &height, &nrChannels, 4);
+
+    if (data)
+    {
+        VkExtent3D imageSize;
+        imageSize.height = height;
+        imageSize.width = width;
+        imageSize.depth = 1;
+
+        _blueNoiseTexture = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+
+        stbi_image_free(data);
+
+
+    }
 
     VkSamplerCreateInfo samplerInfo = {};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -884,6 +919,7 @@ void VulkanEngine::init_default_data()
         destroy_image(_whiteImage);
         destroy_image(_greyImage);
         destroy_image(_errorCheckImage);
+        destroy_image(_blueNoiseTexture);
 
         for (int i = _cloudImages.size(); i--;)
         {
@@ -941,7 +977,7 @@ void VulkanEngine::init_volumetric_data()
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
     obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(100, 100, 100));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(500, 500, 500));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -949,7 +985,7 @@ void VulkanEngine::init_volumetric_data()
     
 
     _cloudVoxels.GPUVoxelInfo.centrePos = glm::vec4(glm::vec3(obj.transform[3]),0.f);
-    _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(glm::vec3(obj.transform[0].x*2.f, obj.transform[1].y * 2.f, obj.transform[2].z * 2.f), 0);
+    _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(glm::vec3(obj.transform[0].x, obj.transform[1].y, obj.transform[2].z), 0);
     
 
     VkExtent3D imageSize;
@@ -1376,8 +1412,20 @@ void VulkanEngine::update_scene()
     sceneData.proj[1][1] *= -1;
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
+    if (mainCamera.isActive == true)
+    {
+        glm::vec3 baseSunDirection = glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f));
 
+        float time = _voxelGenTimer->GetTotalElapsed();
+        float angle = glm::radians(fmod(time * (360.0f / 240.0f), 360.0f));
 
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::vec3 sunlightDir = glm::vec3(rotation * glm::vec4(baseSunDirection, 0.0f));
+
+        sceneData.sunlightDirection.x = glm::normalize(sunlightDir).x;
+        sceneData.sunlightDirection.y = glm::normalize(sunlightDir).y;
+        sceneData.sunlightDirection.z = glm::normalize(sunlightDir).z;
+    }
     update_volumetrics();
     update_billboards();
 
@@ -1390,13 +1438,13 @@ void VulkanEngine::update_scene()
 void VulkanEngine::update_volumetrics()
 {
     OPTICK_EVENT();
-    _voxelGenInfo.time = _voxelGenTimer->GetTotalElapsed() ;
+    _voxelGenInfo.time = fmod(_voxelGenTimer->GetTotalElapsed(), 200.f)/200.f;
     
     _cloudVoxels.GPUVoxelInfo.time = _voxelGenTimer->GetTotalElapsed();
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection >= 999) ? 0 : _voxelGenInfo.reprojection+=1;
+    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection > 4) ? 0 : _cloudVoxels.GPUVoxelInfo.reprojection += 1;
 }
 
 void VulkanEngine::update_billboards()
@@ -1471,6 +1519,18 @@ void VulkanEngine::draw()
 
     vkutil::copy_image_to_image(cmd, _drawImage.image, _backgroundImage.image, _drawExtent, _drawExtent);
 
+    if (!_renderedOnce)
+    {
+        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        vkutil::copy_image_to_image(cmd, _drawImage.image, _drawImageHistory.image, _drawExtent, _drawExtent);
+        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        _renderedOnce = true;
+    }
+    else
+    {
+        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
@@ -1478,6 +1538,9 @@ void VulkanEngine::draw()
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vkutil::copy_image_to_image(cmd, _drawImage.image, _drawImageHistory.image, _drawExtent, _drawExtent);
 
     vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
 
@@ -1750,12 +1813,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
                 else if(draw.material->passType==MaterialPass::Volumetric)
                 {
-                    draw.material->materialSet = get_current_frame()._frameDescriptors.allocate(_device, _volumetricDescriptorLayout);
-                    DescriptorWriter writer;
-                    writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-                    writer.write_image(11, _backgroundImage.imageView, _backgroundSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-                    writer.update_set(_device, draw.material->materialSet);
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &voxelBufferDescriptor, 0, nullptr);
+
                 }
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
             }
@@ -1923,6 +1981,8 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
                     DescriptorWriter writer;
                     writer.write_image(10, _cloudVoxelImage.imageView, _cloudVoxelSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
                     writer.write_image(11, _backgroundImage.imageView, _backgroundSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.write_image(12, _blueNoiseTexture.imageView, _defaultSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                    writer.write_image(13, _drawImageHistory.imageView, _defaultSamplerNearest, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
                     writer.update_set(_device, draw.material->materialSet);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 2, 1, &voxelBufferDescriptor, 0, nullptr);
                 
@@ -1965,6 +2025,12 @@ void VulkanEngine::draw_volumetrics(VkCommandBuffer cmd)
 
 
     vkCmdEndRendering(cmd);
+}
+
+void VulkanEngine::post_render()
+{
+
+    _cloudVoxels.GPUVoxelInfo.prevViewProj = sceneData.viewproj;
 }
 
 void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
@@ -2130,6 +2196,8 @@ void VulkanEngine::run()
         ImGui::Render();
 
         draw();
+
+        post_render();
 
         auto end = std::chrono::system_clock::now();
 

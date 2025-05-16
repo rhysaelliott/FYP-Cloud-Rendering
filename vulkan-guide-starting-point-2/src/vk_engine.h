@@ -104,6 +104,8 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:
+	bool _renderedOnce = false;
+
 	DelectionQueue _mainDeletionQueue;
 
 	bool _isInitialized{ false };
@@ -142,6 +144,7 @@ public:
 	AllocatedImage _drawImage;
 	AllocatedImage _backgroundImage;
 	AllocatedImage _depthImage;
+	AllocatedImage _drawImageHistory;
 
 	VkExtent2D _drawExtent;
 	float renderScale = 1.f;
@@ -161,10 +164,13 @@ public:
 
 	//temporary textures
 	AllocatedImage _whiteImage;
-	std::vector<AllocatedImage> _cloudImages;
-	std::vector<VkSampler> _cloudSamplers;
 	AllocatedImage _greyImage;
 	AllocatedImage _errorCheckImage;
+
+
+	std::vector<AllocatedImage> _cloudImages;
+	std::vector<VkSampler> _cloudSamplers;
+	AllocatedImage _blueNoiseTexture;
 
 	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
@@ -268,6 +274,8 @@ public:
 	void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
 	void update_scene();
+
+	void post_render();
 
 	void update_volumetrics();
 
