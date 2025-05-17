@@ -97,7 +97,7 @@ struct ComputePushConstants
 	glm::vec4 data1;
 	glm::vec4 data2;
 	glm::vec4 data3;
-	glm::vec4 data4;
+	glm::ivec4 data4;
 };
 
 struct ComputeEffect
@@ -270,7 +270,7 @@ struct GPUVoxelGenBuffer
 	float cloudSpeed;
 	float detailSpeed;
 	float time;
-	unsigned int lodLevel;
+	unsigned int reprojection;
 
 	GPUVoxelGenBuffer()
 	{
@@ -286,7 +286,7 @@ struct GPUVoxelGenBuffer
 		//detailSpeed = 0.f;
 		detailSpeed = 3.f;
 		time = 0.f;
-		lodLevel = 0;
+		reprojection = 0;
 	}
 };
 

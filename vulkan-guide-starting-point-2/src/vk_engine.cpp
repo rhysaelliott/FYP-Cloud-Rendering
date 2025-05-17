@@ -977,7 +977,7 @@ void VulkanEngine::init_volumetric_data()
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
     obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(200, 200, 200));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(500, 500, 500));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -994,8 +994,7 @@ void VulkanEngine::init_volumetric_data()
     imageSize.depth = 512;
 
   
-
-    _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, true);
+    _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT, true);
 
     const char* fileName = "..\\..\\assets\\noiseShapePacked.tga";
     int width, height, channels;
@@ -1446,7 +1445,9 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection > 4) ? 0 : _cloudVoxels.GPUVoxelInfo.reprojection += 1;
+    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 4;
+    _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection + 1) % 4;
+
 }
 
 void VulkanEngine::update_billboards()
@@ -1512,7 +1513,7 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    draw_geometry(cmd);
+    //draw_geometry(cmd);
 
     //use background image to draw volumetrics
 
@@ -1618,43 +1619,64 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 {
     OPTICK_EVENT();
+    VkDescriptorSet voxelGenDescriptors = get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
 
-    for (int lod = 0; lod < 1; lod++) {
-        _voxelGenInfo.lodLevel = lod;
+    DescriptorWriter writer;
+    writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-        VkDescriptorSet voxelGenDescriptors = get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
+    writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudShapeSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudNoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-        DescriptorWriter writer;
-        writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    AllocatedBuffer gpuVoxelGenBuffer = create_buffer(sizeof(GPUVoxelGenBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    GPUVoxelGenBuffer* voxelGenBufferData = (GPUVoxelGenBuffer*)gpuVoxelGenBuffer.allocation->GetMappedData();
+    *voxelGenBufferData = _voxelGenInfo;
 
-        writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudShapeSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudNoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_buffer(3, gpuVoxelGenBuffer.buffer, sizeof(_voxelGenInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, voxelGenDescriptors);
 
-        AllocatedBuffer gpuVoxelGenBuffer = create_buffer(sizeof(GPUVoxelGenBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        GPUVoxelGenBuffer* voxelGenBufferData = (GPUVoxelGenBuffer*)gpuVoxelGenBuffer.allocation->GetMappedData();
-        *voxelGenBufferData = _voxelGenInfo;
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
 
-        writer.write_buffer(3, gpuVoxelGenBuffer.buffer, sizeof(_voxelGenInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer.update_set(_device, voxelGenDescriptors);
 
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
+    const int localSize = 8;
 
-        vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-        uint32_t mipWidth = std::max(1u, _cloudVoxelImage.imageExtent.width >> lod);
-        uint32_t mipHeight = std::max(1u, _cloudVoxelImage.imageExtent.height >> lod);
-        uint32_t mipDepth = std::max(1u, _cloudVoxelImage.imageExtent.depth >> lod);
+    const auto& extent = _cloudVoxelImage.imageExtent;
 
-        vkCmdDispatch(cmd,
-            (mipWidth + 7) / 8,
-            (mipHeight + 7) / 8,
-            (mipDepth + 7) / 8);
+    const uint32_t fullW = extent.width;
+    const uint32_t fullH = extent.height;
+    const uint32_t fullD = extent.depth;
 
-        get_current_frame()._deletionQueue.push_function([=, this]() {
-            destroy_buffer(gpuVoxelGenBuffer);
-            });
-    }
+    const uint32_t quadrantW = fullW / 2;
+    const uint32_t quadrantD = fullD / 2;
+
+    int reprojection = _voxelGenInfo.reprojection;
+    int reprojectionX = reprojection % 2;
+    int reprojectionZ = reprojection / 2;
+
+    uint32_t startX = reprojectionX * quadrantW;
+    uint32_t startZ = reprojectionZ * quadrantD;
+
+
+    const uint32_t dispatchX = quadrantW / localSize;
+    const uint32_t dispatchY = fullH / localSize;
+    const uint32_t dispatchZ = quadrantD / localSize;
+
+    int offsetX = (reprojection % 2) * 256;
+    int offsetZ = (reprojection / 2) * 256;
+
+    _voxelGen->data.data4 = glm::ivec4(offsetX, 0, offsetZ, 0);
+
+
+    vkCmdPushConstants(cmd, _voxelGenPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
+
+    vkCmdDispatch(cmd, dispatchX, dispatchY, dispatchZ);
+
+
+    get_current_frame()._deletionQueue.push_function([=, this]() {
+        destroy_buffer(gpuVoxelGenBuffer);
+        });
+    
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
