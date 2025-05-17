@@ -977,7 +977,7 @@ void VulkanEngine::init_volumetric_data()
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
     obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(500, 500, 500));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(200, 200, 200));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -995,7 +995,7 @@ void VulkanEngine::init_volumetric_data()
 
   
 
-    _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false);
+    _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
     const char* fileName = "..\\..\\assets\\noiseShapePacked.tga";
     int width, height, channels;
@@ -1319,7 +1319,7 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
     VkImageCreateInfo imgInfo = vkinit::image_create_info(format, usage, size);
     if (mipmapped)
     {
-        imgInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
+        imgInfo.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max({ size.width, size.height, size.depth })))) + 1;
     }
 
     VmaAllocationCreateInfo allocInfo = {};
@@ -1344,8 +1344,10 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
 
     VK_CHECK(vkCreateImageView(_device, &viewInfo, nullptr, &newImage.imageView));
 
+
     return newImage;
 }
+
 
 AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
 {
@@ -1617,34 +1619,42 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 {
     OPTICK_EVENT();
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
+    for (int lod = 0; lod < 1; lod++) {
+        _voxelGenInfo.lodLevel = lod;
 
-    VkDescriptorSet voxelGenDescriptors =  get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
+        VkDescriptorSet voxelGenDescriptors = get_current_frame()._frameDescriptors.allocate(_device, _voxelGenDescriptorLayout);
 
-    DescriptorWriter writer;
-    writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        DescriptorWriter writer;
+        writer.write_image(0, _cloudVoxelImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-    writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudShapeSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudNoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        writer.write_image(1, _cloudShapeNoiseImage.imageView, _cloudShapeSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        writer.write_image(2, _cloudDetailNoiseImage.imageView, _cloudNoiseSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-    AllocatedBuffer gpuVoxelGenBuffer = create_buffer(sizeof(GPUVoxelGenBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    GPUVoxelGenBuffer* voxelGenBufferData = (GPUVoxelGenBuffer*)gpuVoxelGenBuffer.allocation->GetMappedData();
-    *voxelGenBufferData = _voxelGenInfo;
+        AllocatedBuffer gpuVoxelGenBuffer = create_buffer(sizeof(GPUVoxelGenBuffer), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        GPUVoxelGenBuffer* voxelGenBufferData = (GPUVoxelGenBuffer*)gpuVoxelGenBuffer.allocation->GetMappedData();
+        *voxelGenBufferData = _voxelGenInfo;
 
-    writer.write_buffer(3, gpuVoxelGenBuffer.buffer, sizeof(_voxelGenInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer.write_buffer(3, gpuVoxelGenBuffer.buffer, sizeof(_voxelGenInfo), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer.update_set(_device, voxelGenDescriptors);
 
-    writer.update_set(_device, voxelGenDescriptors);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGen->pipeline);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _voxelGenPipelineLayout, 0, 1, &voxelGenDescriptors, 0, nullptr);
+        vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
 
-    vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
+        uint32_t mipWidth = std::max(1u, _cloudVoxelImage.imageExtent.width >> lod);
+        uint32_t mipHeight = std::max(1u, _cloudVoxelImage.imageExtent.height >> lod);
+        uint32_t mipDepth = std::max(1u, _cloudVoxelImage.imageExtent.depth >> lod);
 
-    vkCmdDispatch(cmd, std::ceil((_cloudVoxelImage.imageExtent.width -7 )/8), std::ceil((_cloudVoxelImage.imageExtent.height-7 )/8), std::ceil((_cloudVoxelImage.imageExtent.depth -7)/8));
+        vkCmdDispatch(cmd,
+            (mipWidth + 7) / 8,
+            (mipHeight + 7) / 8,
+            (mipDepth + 7) / 8);
 
-    get_current_frame()._deletionQueue.push_function([=, this]() {
-        destroy_buffer(gpuVoxelGenBuffer);
-        });
-
+        get_current_frame()._deletionQueue.push_function([=, this]() {
+            destroy_buffer(gpuVoxelGenBuffer);
+            });
+    }
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)

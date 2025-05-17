@@ -2,7 +2,7 @@
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-layout(r8, binding = 0) uniform image3D densityTex;
+layout(r8, binding = 0) uniform writeonly image3D densityTex;
 
 layout(set=0, binding=1) uniform sampler3D shapeNoiseTex;
 layout(set=0, binding=2) uniform sampler3D detailNoiseTex;
@@ -20,7 +20,7 @@ layout(binding=3) uniform VoxelGenInfo
     float cloudSpeed;
     float detailSpeed;
     float time;
-    int reprojection;
+    int lodLevel;
 } voxelGenInfo;
 
 

@@ -270,7 +270,7 @@ struct GPUVoxelGenBuffer
 	float cloudSpeed;
 	float detailSpeed;
 	float time;
-	unsigned int padding;
+	unsigned int lodLevel;
 
 	GPUVoxelGenBuffer()
 	{
@@ -286,6 +286,7 @@ struct GPUVoxelGenBuffer
 		//detailSpeed = 0.f;
 		detailSpeed = 3.f;
 		time = 0.f;
+		lodLevel = 0;
 	}
 };
 
