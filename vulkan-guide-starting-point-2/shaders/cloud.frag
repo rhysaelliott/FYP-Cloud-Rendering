@@ -143,7 +143,7 @@ if(voxelInfo.reprojection!=reprojection && valid)
 	int steps = 0;
 
 	int emptySamples = 0;
-	const int maxEmptySamples = 4;
+	const int maxEmptySamples = 2;
 	bool fineMarch = false;
 
 while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
@@ -160,10 +160,15 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
     uvw = clamp(uvw, vec3(0.0), vec3(1.0));
     float density = texture(voxelBuffer, uvw).r;
 
-    if (density > 0.0)
+    if (density > 0.001)
     {
-        fineMarch = true;
-        emptySamples = 0;
+        if(fineMarch==false)
+        {
+            fineMarch = true;
+            t-=maxStep;
+            emptySamples = 0;
+            continue;
+        }
 
         float stepSize = mix(maxStep, minStep, smoothstep(densityThreshold, 1.0, density));
         float attenuatedDensity = density * stepSize;
@@ -180,7 +185,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
         float sunT = jitter + float(i) * sunStepSize;
         vec3 sunSamplePos = samplePos + sunRay * sunT;
         if (!insideBounds(sunSamplePos, voxelGridMin, voxelGridMax)) continue;
-        
+
         vec3 sunUVW = (sunSamplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
         float sunDensity = texture(voxelBuffer, sunUVW).r;
         sunOcclusion *= exp(-sunDensity * sunStepSize);
@@ -189,10 +194,11 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
         sunI = sunOcclusion * 10.0;
         sunI /= float(NUM_SUN_SAMPLES);
 
-        I += transmit * phase * sunI * powder(density);
+        float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
+        I += transmit * phase * sunI * powder(density) * multiScatterApprox;
 
         transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
-
+        
         t += stepSize;
     }
     else
@@ -215,8 +221,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
 
     steps++;
 }
-
+    
 	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
-
 	outFragColor =vec4(finalColor , 1.0);
 }

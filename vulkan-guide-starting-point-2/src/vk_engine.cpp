@@ -989,9 +989,9 @@ void VulkanEngine::init_volumetric_data()
     
 
     VkExtent3D imageSize;
-    imageSize.width = 512;
-    imageSize.height = 512;
-    imageSize.depth = 512;
+    imageSize.width = 1024;
+    imageSize.height = 1024;
+    imageSize.depth = 1024;
 
   
     _cloudVoxelImage = create_image( imageSize, VK_FORMAT_R8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_CREATE_SPARSE_BINDING_BIT, true);
@@ -1191,7 +1191,7 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
         //.use_default_format_selection()
         .set_desired_format(VkSurfaceFormatKHR{ .format = _swapchainImageFormat,.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         //use vsync present mode
-        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
         .set_desired_extent(width, height)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build()
