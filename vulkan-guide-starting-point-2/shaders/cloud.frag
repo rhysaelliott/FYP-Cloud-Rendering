@@ -95,7 +95,7 @@ vec3 samplePoint = rayOrigin + rayDir * depth;
 vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
 vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
-vec3 noise = texture(blueNoiseTex, fract(uv)).rgb; 
+vec3 noise = texture(blueNoiseTex, uv * 1000000.0).rgb; 
 
 int reprojection = int(floor(noise.r * 4.0));
 bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
@@ -128,25 +128,27 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 	vec3 backgroundColor = texture(backgroundTex, uv).xyz;
 
-	vec3 blueNoise = texture(blueNoiseTex, fract(uv)).rgb;
+	const float sunStepSize = 5.0;
 
-	const float sunStepSize = 1.0;
-
-	const float minStep = 1.0;
+	const float minStep = 0.5;
 	const float maxStep = 5.0;
-	const float densityThreshold = 0.02;
 	const int maxSteps = 1000;
 
 	float I = 0.0;
+    float scatteredLight = 0.0;
 	float transmit = 1.0;
 	float t = 0.0;
 	int steps = 0;
 
 	int emptySamples = 0;
-	const int maxEmptySamples = 2;
+	const int maxEmptySamples = 3;
 	bool fineMarch = false;
+    
 
-while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
+    float viewCosAngle = dot(rayDir, toSun); 
+    float viewPhase = HenyeyGreenstein(eccentricity, viewCosAngle);
+
+while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 {
     vec3 samplePos = rayOrigin + rayDir * t;
     if (!insideBounds(samplePos, voxelGridMin, voxelGridMax)) 
@@ -154,7 +156,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
         t += maxStep; 
         continue;
     }
-    float jitter = (blueNoise.b * (random((gl_FragCoord.xy)*voxelInfo.time - 0.5)));
+    float jitter = (noise.b * (random((gl_FragCoord.xy)- 0.5)));
 	t+= jitter + minStep;
     vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
     uvw = clamp(uvw, vec3(0.0), vec3(1.0));
@@ -170,7 +172,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
             continue;
         }
 
-        float stepSize = mix(maxStep, minStep, smoothstep(densityThreshold, 1.0, density));
+        float stepSize = minStep;
         float attenuatedDensity = density * stepSize;
 
     const int NUM_SUN_SAMPLES = 6;
@@ -180,7 +182,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
     float sunOcclusion = 1.0;
     for (int i = 0; i < NUM_SUN_SAMPLES; ++i) 
     {
-        vec2 rand = fract(blueNoise.xy + float(i));
+        vec2 rand = fract(noise.xy + float(i));
         vec3 sunRay = sample_cone(toSun, coneAngle, rand);
         float sunT = jitter + float(i) * sunStepSize;
         vec3 sunSamplePos = samplePos + sunRay * sunT;
@@ -196,7 +198,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
 
         float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
         I += transmit * phase * sunI * powder(density) * multiScatterApprox;
-
+        scatteredLight += transmit * density * viewPhase * sunI;
         transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
         
         t += stepSize;
@@ -222,6 +224,7 @@ while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps)
     steps++;
 }
     
-	vec3 finalColor = (sunlightColor * I) + (backgroundColor * transmit) ;
+    vec3 godrayColor = sunlightColor * scatteredLight;
+    vec3 finalColor = godrayColor + sunlightColor * I + backgroundColor * transmit;
 	outFragColor =vec4(finalColor , 1.0);
 }

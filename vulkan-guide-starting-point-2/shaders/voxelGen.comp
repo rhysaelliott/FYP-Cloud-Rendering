@@ -31,6 +31,11 @@ layout( push_constant ) uniform constants
  ivec4 data4;
 } PushConstants;
 
+float saturate(in float num)
+{
+	return clamp(num, 0.0,1.0);
+}
+
 float beer(float d)
 {
    return exp(-d);
@@ -38,7 +43,7 @@ float beer(float d)
 
 float heightMap(float h)
 {
-    return  mix(1,(1 - beer(1 * h)) * beer(4 * h), voxelGenInfo.heightMapFactor);
+    return  mix(1,(1 - beer(1 * h)) * beer(2 * h), voxelGenInfo.heightMapFactor);
 }
 
 
@@ -55,7 +60,7 @@ void main()
     float height = nPos.y;
 
     vec3 edgeProximity = min(nPos, vec3(1.0) - nPos);
-    float edgeDistance = min(min(edgeProximity.x, edgeProximity.z),edgeProximity.y);
+    float edgeDistance = saturate(min(min(edgeProximity.x, edgeProximity.z),edgeProximity.y));
 
     vec3 shapeOffset = vec3(voxelGenInfo.time * voxelGenInfo.cloudSpeed);
     vec3 shapePos = nPos + shapeOffset;
@@ -66,29 +71,30 @@ void main()
     vec4 shapeNoise =texture(shapeNoiseTex, shapePos) ;
     vec4 detailNoise =texture(detailNoiseTex, noisePos) ;
 
-    float h = heightMap(height);
+    float h = saturate(heightMap(height));
 
 
 
-    float fbm = dot(shapeNoise, voxelGenInfo.shapeNoiseWeights) * h;
-    float detailFbm = dot(detailNoise, voxelGenInfo.detailNoiseWeights) * (1.0-h);
+    float fbm = saturate(dot(shapeNoise, voxelGenInfo.shapeNoiseWeights) * h);
+    float detailFbm = saturate(dot(detailNoise, voxelGenInfo.detailNoiseWeights) * (1.0-h));
 
-    float cloudDensity =fbm;
-    if(cloudDensity<=0.01)
+    float cloudDensity = fbm;
+
+    
+
+    if(cloudDensity<=0.15 ||shapeNoise.r < 0.3 || shapeNoise.g < 0.3 || shapeNoise.b < 0.3)
     {
         imageStore(densityTex, pos, vec4(density,0,0,0));
+        return;
     }
     else
     {
-        float invFbm = 1.0 - fbm;
-        density = cloudDensity - detailFbm * invFbm * invFbm * invFbm * voxelGenInfo.detailNoiseMultiplier;
-        density *= density;
+        float invFbm = saturate(1.0 - fbm);
+        density = saturate(cloudDensity - detailFbm * invFbm * invFbm * invFbm);
 
-        density*= edgeDistance;
-
+        density *= smoothstep(0.0, 0.5, edgeDistance);
 
         density*=voxelGenInfo.densityMultiplier;
-
         imageStore(densityTex, pos, vec4(density,0,0,0));
     }
 

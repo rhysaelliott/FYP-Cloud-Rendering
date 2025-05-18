@@ -1654,18 +1654,15 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     int reprojectionX = reprojection % 2;
     int reprojectionZ = reprojection / 2;
 
+
     uint32_t startX = reprojectionX * quadrantW;
     uint32_t startZ = reprojectionZ * quadrantD;
-
 
     const uint32_t dispatchX = quadrantW / localSize;
     const uint32_t dispatchY = fullH / localSize;
     const uint32_t dispatchZ = quadrantD / localSize;
 
-    int offsetX = (reprojection % 2) * extent.width / 2.0f;
-    int offsetZ = (reprojection / 2) * extent.depth / 2.0f;
-
-    _voxelGen->data.data4 = glm::ivec4(offsetX, 0, offsetZ, 0);
+    _voxelGen->data.data4 = glm::ivec4(startX, 0, startZ, 0);
 
 
     vkCmdPushConstants(cmd, _voxelGenPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &_voxelGen->data);
@@ -2196,7 +2193,7 @@ void VulkanEngine::run()
 
                     ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.00f, 1.0f);
 
-                    ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 1.f, "%.15f");
+                    ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 10.f, "%.15f");
                     ImGui::SliderFloat("Detail Noise Multiplier", &_voxelGenInfo.detailNoiseMultiplier,  0.f, 10.f, "%.15f");
                     ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.15f");
 
