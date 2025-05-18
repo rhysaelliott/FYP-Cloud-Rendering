@@ -977,7 +977,7 @@ void VulkanEngine::init_volumetric_data()
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
     obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
-    obj.transform=  glm::scale(obj.transform, glm::vec3(500, 500, 500));
+    obj.transform=  glm::scale(obj.transform, glm::vec3(200, 200, 200));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
 
@@ -1513,7 +1513,7 @@ void VulkanEngine::draw()
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    //draw_geometry(cmd);
+   // draw_geometry(cmd);
 
     //use background image to draw volumetrics
 
@@ -1662,8 +1662,8 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
     const uint32_t dispatchY = fullH / localSize;
     const uint32_t dispatchZ = quadrantD / localSize;
 
-    int offsetX = (reprojection % 2) * 256;
-    int offsetZ = (reprojection / 2) * 256;
+    int offsetX = (reprojection % 2) * extent.width / 2.0f;
+    int offsetZ = (reprojection / 2) * extent.depth / 2.0f;
 
     _voxelGen->data.data4 = glm::ivec4(offsetX, 0, offsetZ, 0);
 
@@ -2194,6 +2194,8 @@ void VulkanEngine::run()
                     ImGui::DragFloat4("Shape Noise Weights", glm::value_ptr(_voxelGenInfo.shapeNoiseWeights),0.005f ,0.f,1.f, " % .15f");
                     ImGui::DragFloat4("Detail Noise Weights", glm::value_ptr(_voxelGenInfo.detailNoiseWeights),0.005f ,0.f,1.f, " % .15f");
 
+                    ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.00f, 1.0f);
+
                     ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 1.f, "%.15f");
                     ImGui::SliderFloat("Detail Noise Multiplier", &_voxelGenInfo.detailNoiseMultiplier,  0.f, 10.f, "%.15f");
                     ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.15f");
@@ -2214,10 +2216,10 @@ void VulkanEngine::run()
                 {
 
                     ImGui::Text("Frametime %f ms", stats.frametime);
-                    ImGui::Text("Draw time %f ms", stats.meshDrawTime);
+                    //ImGui::Text("Draw time %f ms", stats.meshDrawTime);
                     ImGui::Text("Update time %f ms", stats.sceneUpdateTime);
-                    ImGui::Text("Triangles %i", stats.triangleCount);
-                    ImGui::Text("Draws %i", stats.drawcallCount);
+                    //ImGui::Text("Triangles %i", stats.triangleCount);
+                    //ImGui::Text("Draws %i", stats.drawcallCount);
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
