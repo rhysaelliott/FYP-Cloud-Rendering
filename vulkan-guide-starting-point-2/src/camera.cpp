@@ -4,9 +4,17 @@
 
 glm::mat4 Camera::getViewMatrix()
 {
+	if (cameraType == Orbit)
+	{
+		glm::mat4 rot = getRotationMatrix();
+		glm::vec3 offset = glm::vec3(rot * glm::vec4(0.0f, 0.0f, distanceToTarget, 0.0f));
+		position = target + offset;
+
+		return glm::lookAt(position, target, glm::vec3(0, 1, 0));
+	}
+
 	glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.f), position);
 	glm::mat4 cameraRotation = getRotationMatrix();
-
 	return glm::inverse(cameraTranslation * cameraRotation);
 }
 glm::mat4 Camera::getRotationMatrix()
@@ -20,6 +28,22 @@ glm::mat4 Camera::getRotationMatrix()
 void Camera::processSDLEvent(SDL_Event& e)
 {
 	if (!isActive) return;
+	if (cameraType == CameraType::Orbit)
+	{
+		if (e.type == SDL_MOUSEMOTION)
+		{
+			yaw += (float)e.motion.xrel / 2000.f;
+			pitch -= (float)e.motion.yrel / 2000.f;
+
+			pitch = glm::clamp(pitch, -glm::half_pi<float>() + 0.01f, glm::half_pi<float>() - 0.01f);
+		}
+		if (e.type == SDL_MOUSEWHEEL)
+		{
+			distanceToTarget -= e.wheel.y;
+			distanceToTarget = glm::clamp(distanceToTarget, 1.0f, 500.0f);
+		}
+		return;
+	}
 	if (e.type == SDL_KEYDOWN)
 	{
 		if (e.key.keysym.sym == SDLK_w) { velocity.z = -1; }
@@ -48,7 +72,7 @@ void Camera::processSDLEvent(SDL_Event& e)
 
 void Camera::update()
 {
-	if (!isActive) return;
+	if (!isActive || cameraType == CameraType::Orbit) return;
 	glm::mat4 cameraRotation = getRotationMatrix();
 	position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.1f, 0.f));
 

@@ -938,7 +938,7 @@ void VulkanEngine::init_default_data()
 
     sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
 
-    sceneData.sunlightDirection = glm::vec4(-1.0f, 1.f, 0.f, 1.0f);
+    sceneData.sunlightDirection = glm::vec4(-1.0f, -1.f, -0.3f, 1.0f);
 
 
     _renderTimeTimer = new Timer("Render Time");
@@ -976,7 +976,7 @@ void VulkanEngine::init_volumetric_data()
     obj.firstIndex = 0;
     obj.indexBuffer = mesh.indexBuffer.buffer;
     obj.material = &_volumetricMaterial;
-    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.0f, -70.0f));
+    obj.transform =  glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     obj.transform=  glm::scale(obj.transform, glm::vec3(200, 200, 200));
     obj.vertexBufferAddress = mesh.vertexBufferAddress;
     obj.meshBuffer = mesh;
@@ -1415,7 +1415,7 @@ void VulkanEngine::update_scene()
 
     if (mainCamera.isActive == true)
     {
-        glm::vec3 baseSunDirection = glm::normalize(glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec3 baseSunDirection = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.3f));
 
         float time = _voxelGenTimer->GetTotalElapsed();
         float angle = glm::radians(fmod(time * (360.0f / 240.0f), 360.0f));
@@ -2138,6 +2138,19 @@ void VulkanEngine::run()
                     {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         mainCamera.isActive = true;
+                    }
+                }
+                if (e.key.keysym.sym == SDLK_2)
+                {
+                    if (mainCamera.cameraType == CameraType::Follow)
+                    {
+
+                        mainCamera.cameraType = CameraType::Orbit;
+                    }
+                    else
+                    {
+
+                        mainCamera.cameraType = CameraType::Follow;
                     }
                 }
             }

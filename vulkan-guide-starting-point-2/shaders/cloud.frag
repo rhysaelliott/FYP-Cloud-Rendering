@@ -100,6 +100,8 @@ vec3 noise = texture(blueNoiseTex, uv * 1000000.0).rgb;
 int reprojection = int(floor(noise.r * 4.0));
 bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
 
+vec3 finalColor;
+
 //TODO when camera moves a lot when there is no clouds the background looks jank
 if(voxelInfo.reprojection!=reprojection && valid)
 {
@@ -121,10 +123,11 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 	vec3 toSun = -sunlightDir;
 
-	float cosAngle = cos(dot(rayDir,toSun));
+	float cosAngle = dot(rayDir,toSun);
 	float eccentricity=0.99;
 
 	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
+    phase *=0.5;
 
 	vec3 backgroundColor = texture(backgroundTex, uv).xyz;
 
@@ -142,11 +145,7 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 	int emptySamples = 0;
 	const int maxEmptySamples = 3;
-	bool fineMarch = false;
-    
-
-    float viewCosAngle = dot(rayDir, toSun); 
-    float viewPhase = HenyeyGreenstein(eccentricity, viewCosAngle);
+	bool fineMarch = false;    
 
 while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 {
@@ -198,7 +197,7 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 
         float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
         I += transmit * phase * sunI * powder(density) * multiScatterApprox;
-        scatteredLight += transmit * density * viewPhase * sunI;
+        scatteredLight += transmit * density * phase * sunI;
         transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
         
         t += stepSize;
@@ -223,8 +222,11 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 
     steps++;
 }
+    float ambientBoost = smoothstep(0.1, 0.5, 1.0 - transmit); 
+    I += 0.4 * ambientBoost;
+
+    vec3 godrayColor = sunlightColor * scatteredLight * I;
+    finalColor = godrayColor + sunlightColor * I + backgroundColor * transmit;
     
-    vec3 godrayColor = sunlightColor * scatteredLight;
-    vec3 finalColor = godrayColor + sunlightColor * I + backgroundColor * transmit;
 	outFragColor =vec4(finalColor , 1.0);
 }

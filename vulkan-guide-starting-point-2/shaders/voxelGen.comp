@@ -75,8 +75,8 @@ void main()
 
 
 
-    float fbm = saturate(dot(shapeNoise, voxelGenInfo.shapeNoiseWeights) * h);
-    float detailFbm = saturate(dot(detailNoise, voxelGenInfo.detailNoiseWeights) * (1.0-h));
+    float fbm = dot(shapeNoise, voxelGenInfo.shapeNoiseWeights) * h;
+    float detailFbm = dot(detailNoise, voxelGenInfo.detailNoiseWeights) * (1.0-h);
 
     float cloudDensity = fbm;
 
@@ -92,7 +92,7 @@ void main()
         float invFbm = saturate(1.0 - fbm);
         density = saturate(cloudDensity - detailFbm * invFbm * invFbm * invFbm);
 
-        density *= smoothstep(0.0, 0.5, edgeDistance);
+        density *= smoothstep(0.0, 0.9, edgeDistance);
 
         density*=voxelGenInfo.densityMultiplier;
         imageStore(densityTex, pos, vec4(density,0,0,0));
