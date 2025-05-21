@@ -35,7 +35,7 @@ void main()
 	vec4 position = PushConstants.render_matrix * vec4(v.position,1.0f);
 	gl_Position = sceneData.viewproj * position;
 	outPos= position.xyz;
-	rayOrigin=  inverse(sceneData.view)[3].xyz;
+	rayOrigin=  sceneData.cameraPos.xyz;
 
 
 }

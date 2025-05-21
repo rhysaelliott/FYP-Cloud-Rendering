@@ -54,7 +54,7 @@ float random(vec2 uv) {
 
 float HenyeyGreenstein(float angle, float g)
 {
-	return ((1.0-g)/ pow((1.0+g*g-2.0*g*angle),3.0/2.0))/4.0*3.1459;
+	return (1.0f - pow(g,2)) / (4.0f * 3.14159 * pow(1 + pow(g, 2) - 2.0f * g * angle, 1.5f));
 }
 
 vec3 sample_cone(vec3 dir, float coneAngle, vec2 rand)
@@ -97,7 +97,7 @@ vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
 vec3 noise = texture(blueNoiseTex, uv * 1000000.0).rgb; 
 
-int reprojection = int(floor(noise.r * 4.0));
+int reprojection = int(floor(noise.r * 2.0));
 bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
 
 vec3 finalColor;
@@ -117,17 +117,16 @@ if(voxelInfo.reprojection!=reprojection && valid)
 	vec3 voxelGridMin = voxelGridCentre - voxelDimension*0.5;
 	vec3 voxelGridMax = voxelGridCentre + voxelDimension*0.5;
 
-	vec3 sunlightDir = normalize(sceneData.sunlightDirection.xyz);
+	vec3 sunlightDir = sceneData.sunlightDirection.xyz;
 
 	vec3 sunlightColor = sceneData.sunlightColor.xyz;
 
-	vec3 toSun = -sunlightDir;
+	vec3 toSun = normalize (sunlightDir);
 
-	float cosAngle = dot(rayDir,toSun);
-	float eccentricity=0.99;
+	float cosAngle = dot(rayDir, toSun);
+	float eccentricity=0.7;
 
-	float phase = max(HenyeyGreenstein(eccentricity, cosAngle), voxelInfo.silverIntensity*HenyeyGreenstein(cosAngle,0.99-voxelInfo.silverSpread)) ;
-    phase *=0.5;
+	float phase = max(HenyeyGreenstein(cosAngle, eccentricity), voxelInfo.silverIntensity*HenyeyGreenstein(cos(cosAngle),0.90-voxelInfo.silverSpread)) ;
 
 	vec3 backgroundColor = texture(backgroundTex, uv).xyz;
 
@@ -149,7 +148,7 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 {
-    vec3 samplePos = rayOrigin + rayDir * t;
+    vec3 samplePos = rayOrigin + (rayDir * t);
     if (!insideBounds(samplePos, voxelGridMin, voxelGridMax)) 
     {
         t += maxStep; 
@@ -197,10 +196,12 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 
         float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
         I += transmit * phase * sunI * powder(density) * multiScatterApprox;
-        scatteredLight += transmit * density * phase * sunI;
+        scatteredLight += transmit * powder(density)  * phase * sunI;
         transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
         
         t += stepSize;
+
+        I = min(I, 1.0);
     }
     else
     {
@@ -222,11 +223,13 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
 
     steps++;
 }
-    float ambientBoost = smoothstep(0.1, 0.5, 1.0 - transmit); 
-    I += 0.4 * ambientBoost;
+    float ambientBoost = smoothstep(0.0, 0.5 , 1.0 - transmit); 
+    I +=  0.4 * ambientBoost;
 
     vec3 godrayColor = sunlightColor * scatteredLight * I;
-    finalColor = godrayColor + sunlightColor * I + backgroundColor * transmit;
+    finalColor = (godrayColor + sunlightColor * I )+ (backgroundColor * transmit);
     
 	outFragColor =vec4(finalColor , 1.0);
+
+    
 }

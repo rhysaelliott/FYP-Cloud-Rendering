@@ -159,6 +159,7 @@ struct GPUSceneData
 	glm::vec4 ambientColor;
 	glm::vec4 sunlightDirection;
 	glm::vec4 sunlightColor;
+	glm::vec4 cameraPos;
 };
 
 struct LightBuffer
@@ -250,7 +251,7 @@ struct GPUVoxelBuffer
 	GPUVoxelBuffer()
 	{
 
-		outScatterMultiplier = 0.17f;
+		outScatterMultiplier = 0.077f;
 		silverIntensity = 1.0f;
 		silverSpread = 0.27f;
 		reprojection = 0;

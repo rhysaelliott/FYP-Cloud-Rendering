@@ -938,7 +938,7 @@ void VulkanEngine::init_default_data()
 
     sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
 
-    sceneData.sunlightDirection = glm::vec4(-1.0f, -1.f, -0.3f, 1.0f);
+    sceneData.sunlightDirection = glm::vec4(-1.0f, -1.f, -0.3f, 0.0f);
 
 
     _renderTimeTimer = new Timer("Render Time");
@@ -1413,19 +1413,21 @@ void VulkanEngine::update_scene()
     sceneData.proj[1][1] *= -1;
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
+    sceneData.cameraPos = glm::vec4(mainCamera.position.x, mainCamera.position.y, mainCamera.position.z, 1.0f);
+
     if (mainCamera.isActive == true)
     {
         glm::vec3 baseSunDirection = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.3f));
 
         float time = _voxelGenTimer->GetTotalElapsed();
-        float angle = glm::radians(fmod(time * (360.0f / 240.0f), 360.0f));
+        float angle = glm::radians(fmod(time * (360.0f / 6.0f), 360.0f));
 
-        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 1.0f, 1.0f));
         glm::vec3 sunlightDir = glm::vec3(rotation * glm::vec4(baseSunDirection, 0.0f));
 
-        sceneData.sunlightDirection.x = glm::normalize(sunlightDir).x;
-        sceneData.sunlightDirection.y = glm::normalize(sunlightDir).y;
-        sceneData.sunlightDirection.z = glm::normalize(sunlightDir).z;
+        //sceneData.sunlightDirection.x = glm::normalize(sunlightDir).x;
+        //sceneData.sunlightDirection.y = glm::normalize(sunlightDir).y;
+        //sceneData.sunlightDirection.z = glm::normalize(sunlightDir).z;
     }
     update_volumetrics();
     update_billboards();
@@ -1445,7 +1447,7 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 4;
+    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 2;
     _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection + 1) % 4;
 
 }
