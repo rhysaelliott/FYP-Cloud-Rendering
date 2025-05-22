@@ -250,9 +250,10 @@ struct GPUVoxelBuffer
 
 	GPUVoxelBuffer()
 	{
-
-		outScatterMultiplier = 0.077f;
-		silverIntensity = 1.0f;
+		centrePos = glm::vec4(0, 0, 0, 0);
+		bounds = glm::vec4(200, 200, 200, 0);
+		outScatterMultiplier = 0.064f;
+		silverIntensity = 1.5f;
 		silverSpread = 0.27f;
 		reprojection = 0;
 	}
@@ -282,9 +283,7 @@ struct GPUVoxelGenBuffer
 		detailNoiseScale = 0.8f;
 
 		heightMapFactor = 0.878f;
-		//cloudSpeed = 0.0f;
 		cloudSpeed = 0.8f;
-		//detailSpeed = 0.f;
 		detailSpeed = 3.f;
 		time = 0.f;
 		reprojection = 0;

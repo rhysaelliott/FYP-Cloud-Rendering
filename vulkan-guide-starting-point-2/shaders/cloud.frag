@@ -96,7 +96,7 @@ vec3 samplePoint = rayOrigin + rayDir * depth;
 vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
 vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
-vec2 noiseUV = mod(gl_FragCoord.xy, 128.0) / 128.0;
+vec2 noiseUV = mod(gl_FragCoord.xy, 64.0) / 64.0;
 vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
 
 int reprojection = int(floor(noise.r * 4.0));

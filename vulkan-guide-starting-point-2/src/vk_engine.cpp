@@ -937,8 +937,8 @@ void VulkanEngine::init_default_data()
     sceneData.ambientColor = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
 
     sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
+    sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
 
-    sceneData.sunlightDirection = glm::vec4(-1.0f, -1.f, -0.3f, 0.0f);
 
 
     _renderTimeTimer = new Timer("Render Time");
@@ -1416,21 +1416,6 @@ void VulkanEngine::update_scene()
 
     sceneData.cameraPos = glm::vec4(mainCamera.position.x, mainCamera.position.y, mainCamera.position.z, 1.0f);
 
-
-    if (mainCamera.isActive == true)
-    {
-        glm::vec3 baseSunDirection = glm::normalize(glm::vec3(-1.0f, -1.0f, -0.3f));
-
-        float time = _voxelGenTimer->GetTotalElapsed();
-        float angle = glm::radians(fmod(time * (360.0f / 6.0f), 360.0f));
-
-        glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 1.0f, 1.0f));
-        glm::vec3 sunlightDir = glm::vec3(rotation * glm::vec4(baseSunDirection, 0.0f));
-
-        //sceneData.sunlightDirection.x = glm::normalize(sunlightDir).x;
-        //sceneData.sunlightDirection.y = glm::normalize(sunlightDir).y;
-        //sceneData.sunlightDirection.z = glm::normalize(sunlightDir).z;
-    }
     update_volumetrics();
     update_billboards();
 
@@ -2194,47 +2179,65 @@ void VulkanEngine::run()
             {
                 if (ImGui::BeginTabItem("clouds"))
                 {
-                    ImGui::Text("General");
-                    ImGui::Spacing();
-                    ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
-                    static float yaw = -90.0f; 
-                    static float pitch = -90.0f; 
+                    static float yawRad = glm::radians( - 90.0f);
+                    static float pitchRad = glm::radians( - 89.0f);
 
-                    ImGui::SliderAngle("Yaw", &yaw, -90.0f, 90.0f);
-                    ImGui::SliderAngle("Pitch", &pitch, -89.9f, 89.9f); 
+                    if (ImGui::Button("Reset All"))
+                    {
+                        _cloudVoxels.GPUVoxelInfo = GPUVoxelBuffer(); 
+                        _voxelGenInfo = GPUVoxelGenBuffer();
+                        sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
+                        sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
+                        yawRad = glm::radians(-89.0f);
+                        pitchRad = glm::radians(-89.0f);
+                    }
 
-                    sceneData.sunlightDirection = glm::normalize(glm::vec4(glm::cos(pitch) * glm::cos(yaw), glm::sin(pitch), glm::cos(pitch) * glm::sin(yaw), 0));
-                    
-                    ImGui::Text("Sun Dir: (%.2f, %.2f, %.2f)",
-                        sceneData.sunlightDirection.x,
-                        sceneData.sunlightDirection.y,
-                        sceneData.sunlightDirection.z);
+                    if (ImGui::CollapsingHeader("Sunlight", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
 
-                    ImGui::Text("Billboard Clouds");
-                    ImGui::Spacing();
-                    ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
+            
 
-                    ImGui::Text("Volumetric Clouds");
-                    ImGui::Spacing();
-                    ImGui::DragFloat4("Shape Noise Weights", glm::value_ptr(_voxelGenInfo.shapeNoiseWeights),0.005f ,0.f,1.f, " % .15f");
-                    ImGui::DragFloat4("Detail Noise Weights", glm::value_ptr(_voxelGenInfo.detailNoiseWeights),0.005f ,0.f,1.f, " % .15f");
+                        ImGui::SliderAngle("Yaw", &yawRad, -90.0f, 90.0f);
+                        ImGui::SliderAngle("Pitch", &pitchRad, -89.9f, 89.9f);
 
-                    ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.00f, 1.0f);
+                        sceneData.sunlightDirection = glm::normalize(glm::vec4(
+                            glm::cos(pitchRad) * glm::cos(yawRad),
+                            glm::sin(pitchRad),
+                            glm::cos(pitchRad) * glm::sin(yawRad),
+                            0.0f));
 
-                    ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 10.f, "%.15f");
-                    ImGui::SliderFloat("Detail Noise Multiplier", &_voxelGenInfo.detailNoiseMultiplier,  0.f, 10.f, "%.15f");
-                    ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.15f");
+                        ImGui::Text("Sun Dir: (%.2f, %.2f, %.2f)",
+                            sceneData.sunlightDirection.x,
+                            sceneData.sunlightDirection.y,
+                            sceneData.sunlightDirection.z);
+                    }
 
+                    ImGui::Separator();
 
-                    ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.f, 1.f, "%.15f");
-                    ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.15f");
-                    ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed,  0.f, 100.f, "%.15f");
+                    if (ImGui::CollapsingHeader("Volumetric Cloud Generation", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::DragFloat4("Shape Noise Weights", glm::value_ptr(_voxelGenInfo.shapeNoiseWeights), 0.005f, 0.f, 1.f, "%.3f");
+                        ImGui::DragFloat4("Detail Noise Weights", glm::value_ptr(_voxelGenInfo.detailNoiseWeights), 0.005f, 0.f, 1.f, "%.3f");
 
-                    ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.01f, 0.5f, "%.05f");
-                    ImGui::SliderFloat("Silver Intensity", &_cloudVoxels.GPUVoxelInfo.silverIntensity, 0.01f, 1.5f, "%.05f");
-                    ImGui::SliderFloat("Silver Spread", &_cloudVoxels.GPUVoxelInfo.silverSpread, 0.01f, 1.5f, "%.05f");
+                        ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.3f");
+                        ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 10.f, "%.3f");
+                        ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.8f, 1.f, "%.3f");
 
+                        ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.1f");
+                        ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.f, 100.f, "%.1f");
 
+                        ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.0f, 1.0f);
+                    }
+
+                    ImGui::Separator();
+
+                    if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::SliderFloat("Out Scatter Multiplier", &_cloudVoxels.GPUVoxelInfo.outScatterMultiplier, 0.01f, 0.5f, "%.3f");
+                        ImGui::SliderFloat("Silver Intensity", &_cloudVoxels.GPUVoxelInfo.silverIntensity, 0.01f, 1.5f, "%.3f");
+                        ImGui::SliderFloat("Silver Spread", &_cloudVoxels.GPUVoxelInfo.silverSpread, 0.01f, 1.5f, "%.3f");
+                    }
                     ImGui::EndTabItem();
                 }
 
@@ -2243,33 +2246,42 @@ void VulkanEngine::run()
         }
 
         ImGui::End();
-        if (ImGui::Begin("Debug Info"))
+        if (ImGui::Begin("Info"))
         {
+            ImGui::SetWindowFontScale(1.5f);
+
+            if (mainCamera.isActive == false)
+            {
+                ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "Camera movement disabled in debug mode");
+                ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "Use the mouse to change values");
+            }
+
             ImGui::Text("Hotkeys:");
             ImGui::BulletText("1 - Toggle Debug");
             ImGui::BulletText("2 - Swap Camera Mode");
 
-            if (mainCamera.isActive == false)
-            {
-                ImGui::Text("Camera disabled in debug mode");
-            }
 
-            else if (mainCamera.cameraType == CameraType::Follow)
+            if (mainCamera.cameraType == CameraType::Follow)
             {
+                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "Camera Mode: Fly");
                 ImGui::BulletText("W - Move Forward");
                 ImGui::BulletText("A - Move Backward");
                 ImGui::BulletText("S - Move Left");
                 ImGui::BulletText("D - Move Right");
-                ImGui::BulletText("Mouse - Rotate");
+                ImGui::BulletText("E - Move Upward");
+                ImGui::BulletText("Q - Move Downward");
+                ImGui::BulletText("Mouse Move - Rotate");
             }
             else
             {
-                ImGui::BulletText("Mouse - Rotate");
+                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "Camera Mode: Orbit");
+                ImGui::BulletText("Mouse Move - Rotate");
                 ImGui::BulletText("Mouse Scroll - Zoom");
              
             }
             ImGui::Text("Frametime %f ms", stats.frametime);
             ImGui::Text("Update time %f ms", stats.sceneUpdateTime);
+            ImGui::SetWindowFontScale(1.0f);
         }
         ImGui::End();
         ImGui::Render();
