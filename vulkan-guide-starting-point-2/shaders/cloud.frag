@@ -134,7 +134,7 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 	const float sunStepSize = 5.0;
 
-	const float minStep = 1.0;
+	const float minStep = 0.5;
 	const float maxStep = 5.0;
 	const int maxSteps = 500;
 
@@ -145,10 +145,12 @@ if(voxelInfo.reprojection!=reprojection && valid)
 	int steps = 0;
 
 	int emptySamples = 0;
-	const int maxEmptySamples = 3;
+	const int maxEmptySamples = 2;
 	bool fineMarch = false;    
 
-while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
+    int hits =0;
+
+while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps && hits <20)
 {
     vec3 samplePos = rayOrigin + (rayDir * t);
     if (!insideBounds(samplePos, voxelGridMin, voxelGridMax)) 
@@ -171,7 +173,7 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
             emptySamples = 0;
             continue;
         }
-
+        hits++;
         float stepSize = minStep;
         float attenuatedDensity = density * stepSize;
 
@@ -203,7 +205,6 @@ while (t<=maxSteps && I < 0.8 && transmit > 0.01 && steps < maxSteps)
         
         t += stepSize;
 
-        I = min(I, 1.0);
     }
     else
     {
