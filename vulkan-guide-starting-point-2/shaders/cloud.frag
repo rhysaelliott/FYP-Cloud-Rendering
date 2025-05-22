@@ -89,15 +89,17 @@ worldPos /= worldPos.w;
 
 vec3 rayDir = normalize(worldPos.xyz - rayOrigin); 
 
-float depth = 1000.0 ;
+vec3 toCentre = voxelInfo.centrePos.xyz - rayOrigin;
+float depth = max(dot(toCentre, rayDir), 100);
 vec3 samplePoint = rayOrigin + rayDir * depth;
 
 vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
 vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
-vec3 noise = texture(blueNoiseTex, uv * 1000000.0).rgb; 
+vec2 noiseUV = mod(gl_FragCoord.xy, 128.0) / 128.0;
+vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
 
-int reprojection = int(floor(noise.r * 2.0));
+int reprojection = int(floor(noise.r * 4.0));
 bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
 
 vec3 finalColor;

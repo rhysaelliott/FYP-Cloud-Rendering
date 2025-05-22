@@ -1395,6 +1395,7 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
     return newImage;
 }
 
+
 void VulkanEngine::update_scene()
 {
     OPTICK_EVENT();
@@ -1414,6 +1415,7 @@ void VulkanEngine::update_scene()
     sceneData.viewproj = sceneData.proj * sceneData.view;
 
     sceneData.cameraPos = glm::vec4(mainCamera.position.x, mainCamera.position.y, mainCamera.position.z, 1.0f);
+
 
     if (mainCamera.isActive == true)
     {
@@ -1447,7 +1449,7 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 2;
+    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 4;
     _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection + 1) % 4;
 
 }
@@ -2195,8 +2197,19 @@ void VulkanEngine::run()
                     ImGui::Text("General");
                     ImGui::Spacing();
                     ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
-                    ImGui::DragFloat3("Sunlight Direction", glm::value_ptr(sceneData.sunlightDirection), 0.05f, -1.0f, 1.0f, " % .15f");
+                    static float yaw = -90.0f; 
+                    static float pitch = -90.0f; 
+
+                    ImGui::SliderAngle("Yaw", &yaw, -90.0f, 90.0f);
+                    ImGui::SliderAngle("Pitch", &pitch, -89.9f, 89.9f); 
+
+                    sceneData.sunlightDirection = glm::normalize(glm::vec4(glm::cos(pitch) * glm::cos(yaw), glm::sin(pitch), glm::cos(pitch) * glm::sin(yaw), 0));
                     
+                    ImGui::Text("Sun Dir: (%.2f, %.2f, %.2f)",
+                        sceneData.sunlightDirection.x,
+                        sceneData.sunlightDirection.y,
+                        sceneData.sunlightDirection.z);
+
                     ImGui::Text("Billboard Clouds");
                     ImGui::Spacing();
                     ImGui::SliderInt("Transparency Mode", &_billboardTransparencyType, 0, 1);
@@ -2224,21 +2237,41 @@ void VulkanEngine::run()
 
                     ImGui::EndTabItem();
                 }
-                if (ImGui::BeginTabItem("stats"))
-                {
 
-                    ImGui::Text("Frametime %f ms", stats.frametime);
-                    //ImGui::Text("Draw time %f ms", stats.meshDrawTime);
-                    ImGui::Text("Update time %f ms", stats.sceneUpdateTime);
-                    //ImGui::Text("Triangles %i", stats.triangleCount);
-                    //ImGui::Text("Draws %i", stats.drawcallCount);
-                    ImGui::EndTabItem();
-                }
                 ImGui::EndTabBar();
             }
         }
-        ImGui::End();
 
+        ImGui::End();
+        if (ImGui::Begin("Debug Info"))
+        {
+            ImGui::Text("Hotkeys:");
+            ImGui::BulletText("1 - Toggle Debug");
+            ImGui::BulletText("2 - Swap Camera Mode");
+
+            if (mainCamera.isActive == false)
+            {
+                ImGui::Text("Camera disabled in debug mode");
+            }
+
+            else if (mainCamera.cameraType == CameraType::Follow)
+            {
+                ImGui::BulletText("W - Move Forward");
+                ImGui::BulletText("A - Move Backward");
+                ImGui::BulletText("S - Move Left");
+                ImGui::BulletText("D - Move Right");
+                ImGui::BulletText("Mouse - Rotate");
+            }
+            else
+            {
+                ImGui::BulletText("Mouse - Rotate");
+                ImGui::BulletText("Mouse Scroll - Zoom");
+             
+            }
+            ImGui::Text("Frametime %f ms", stats.frametime);
+            ImGui::Text("Update time %f ms", stats.sceneUpdateTime);
+        }
+        ImGui::End();
         ImGui::Render();
 
         draw();
