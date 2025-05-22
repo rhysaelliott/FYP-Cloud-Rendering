@@ -134,9 +134,9 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
 	const float sunStepSize = 5.0;
 
-	const float minStep = 0.5;
+	const float minStep = 1.0;
 	const float maxStep = 5.0;
-	const int maxSteps = 1000;
+	const int maxSteps = 500;
 
 	float I = 0.0;
     float scatteredLight = 0.0;

@@ -7,9 +7,8 @@
 class Timer
 {
 public:
-	//constructor (with name of whats being tracked)
 
-	Timer(std::string timerName) { name = timerName; callCount = 0; totalElapsed = 50.f; }
+	Timer(std::string timerName) { name = timerName; callCount = 0; totalElapsed = 0.f; }
 	~Timer() {
 	};
 	void Start()
@@ -19,13 +18,14 @@ public:
 	void Stop()
 	{
 		auto end = std::chrono::steady_clock::now();
-		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		std::chrono::duration<float, std::milli> duration = end - start;
+		elapsed = duration.count();
 		callCount++;
-		totalElapsed += elapsed.count() /1000.f;
+		totalElapsed += elapsed;
 	}
 	float GetElapsed() 
 	{
-		return elapsed.count() / 1000.f;
+		return elapsed;
 	}
 	float GetAverageElapsed() 
 	{
@@ -39,7 +39,7 @@ public:
 private:
 
 	std::chrono::steady_clock::time_point start;
-	std::chrono::milliseconds elapsed;
+	float elapsed;
 	float totalElapsed;
 	std::string name;
 	uint32_t callCount;

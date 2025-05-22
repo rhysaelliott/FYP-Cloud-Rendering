@@ -1024,7 +1024,6 @@ void VulkanEngine::init_volumetric_data()
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
    
-    _voxelGenTimer = new Timer("VoxelGen");
 
     
 
@@ -1191,7 +1190,7 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
         //.use_default_format_selection()
         .set_desired_format(VkSurfaceFormatKHR{ .format = _swapchainImageFormat,.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         //use vsync present mode
-        .set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
         .set_desired_extent(width, height)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build()
@@ -1399,7 +1398,6 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
 void VulkanEngine::update_scene()
 {
     OPTICK_EVENT();
-    auto start = std::chrono::system_clock::now();
 
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
@@ -1419,18 +1417,17 @@ void VulkanEngine::update_scene()
     update_volumetrics();
     update_billboards();
 
-    auto end = std::chrono::system_clock::now();
 
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    stats.sceneUpdateTime = elapsed.count() / 1000.f;
+
+    
 }
 
 void VulkanEngine::update_volumetrics()
 {
     OPTICK_EVENT();
-    _voxelGenInfo.time = fmod(_voxelGenTimer->GetTotalElapsed(), 200.f)/200.f;
+    _voxelGenInfo.time = fmod(_renderTimeTimer->GetTotalElapsed()/1000.f, 200.f)/200.f;
     
-    _cloudVoxels.GPUVoxelInfo.time = _voxelGenTimer->GetTotalElapsed();
+    _cloudVoxels.GPUVoxelInfo.time = _renderTimeTimer->GetTotalElapsed()/1000.f;
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
@@ -1668,7 +1665,6 @@ void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 {
     OPTICK_EVENT();
-    _renderTimeTimer->Start();
 
     std::vector<uint32_t> opaqueDraws;
     opaqueDraws.reserve(mainDrawContext.OpaqueSurfaces.size());
@@ -1915,8 +1911,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
     auto end = std::chrono::system_clock::now();
 
-    _renderTimeTimer->Stop();
-    stats.meshDrawTime = _renderTimeTimer->GetElapsed();
+;
 
 
     vkCmdEndRendering(cmd);
@@ -2102,8 +2097,6 @@ void VulkanEngine::run()
         auto start = std::chrono::system_clock::now();
 
        OPTICK_FRAME("main");
-
-        _voxelGenTimer->Start();
         // Handle events on queue
         while (SDL_PollEvent(&e) != 0) {
             // close the window when user alt-f4s or clicks the X button
@@ -2171,6 +2164,8 @@ void VulkanEngine::run()
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL2_NewFrame();
+
+
         ImGui::NewFrame();
         
         if (ImGui::Begin("debugging"))
@@ -2222,12 +2217,13 @@ void VulkanEngine::run()
 
                         ImGui::SliderFloat("Detail Noise Scale", &_voxelGenInfo.detailNoiseScale, 0.f, 10.f, "%.3f");
                         ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 10.f, "%.3f");
-                        ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.8f, 1.f, "%.3f");
+                        ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.85f, 1.f, "%.3f");
 
                         ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.1f");
                         ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.f, 100.f, "%.1f");
 
                         ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.0f, 1.0f);
+                        _cloudVoxels.GPUVoxelInfo.bounds = glm::max(_cloudVoxels.GPUVoxelInfo.bounds, glm::vec4(1.0f));
                     }
 
                     ImGui::Separator();
@@ -2280,22 +2276,22 @@ void VulkanEngine::run()
              
             }
             ImGui::Text("Frametime %f ms", stats.frametime);
-            ImGui::Text("Update time %f ms", stats.sceneUpdateTime);
+            ImGui::Text("Average Frametime %f ms", stats.averageFrameTime);
             ImGui::SetWindowFontScale(1.0f);
         }
         ImGui::End();
         ImGui::Render();
 
+        _renderTimeTimer->Start();
         draw();
+
+        _renderTimeTimer->Stop();
+        stats.frametime = _renderTimeTimer->GetElapsed();
+        stats.averageFrameTime = _renderTimeTimer->GetAverageElapsed();
 
         post_render();
 
         auto end = std::chrono::system_clock::now();
-
-        _voxelGenTimer->Stop();
-
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        stats.frametime = elapsed.count() / 1000.f;
     }
 }
 

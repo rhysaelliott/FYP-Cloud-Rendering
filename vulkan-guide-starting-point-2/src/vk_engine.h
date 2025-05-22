@@ -98,6 +98,7 @@ struct EngineStats
 	int drawcallCount;
 	float sceneUpdateTime;
 	float meshDrawTime;
+	float averageFrameTime;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -222,7 +223,6 @@ public:
 	VkSampler _cloudShapeSampler;
 	VkSampler _cloudNoiseSampler;
 
-	Timer* _voxelGenTimer;
 
 	//billboards
 	MaterialPipeline _billboardPipeline[2];
