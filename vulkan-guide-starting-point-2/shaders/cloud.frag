@@ -80,36 +80,34 @@ bool insideBounds(vec3 p, vec3 minV, vec3 maxV)
 void main()
 {
 
-vec2 uv = gl_FragCoord.xy / voxelInfo.screenRes;
-vec2 ndc = uv * 2.0 - 1.0;
+    vec2 uv = gl_FragCoord.xy / voxelInfo.screenRes;
+    vec2 ndc = uv * 2.0 - 1.0;
 
-vec4 currClipPos = vec4(ndc, 0.5, 1.0); 
-vec4 worldPos = inverse(sceneData.viewproj) * currClipPos;
-worldPos /= worldPos.w;
+    vec4 currClipPos = vec4(ndc, 0.5, 1.0); 
+    vec4 worldPos = inverse(sceneData.viewproj) * currClipPos;
+    worldPos /= worldPos.w;
 
-vec3 rayDir = normalize(worldPos.xyz - rayOrigin); 
+    vec3 rayDir = normalize(worldPos.xyz - rayOrigin); 
 
-vec3 toCentre = voxelInfo.centrePos.xyz - rayOrigin;
-float depth = max(dot(toCentre, rayDir), 100);
-vec3 samplePoint = rayOrigin + rayDir * depth;
+    vec3 toCentre = voxelInfo.centrePos.xyz - rayOrigin;
+    float depth = max(dot(toCentre, rayDir), 100);
+    vec3 samplePoint = rayOrigin + rayDir * depth;
 
-vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
-vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
+    vec4 prevClip = voxelInfo.prevViewProj * vec4(samplePoint, 1.0);
+    vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
-vec2 noiseUV = mod(gl_FragCoord.xy, 64.0) / 64.0;
-vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
+    vec2 noiseUV = mod(gl_FragCoord.xy, 64.0) / 64.0;
+    vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
 
-int reprojection = int(floor(noise.r * 4.0));
-bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
+    int reprojection = int(floor(noise.r * 4.0));
+    bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
+    vec3 finalColor;
 
-vec3 finalColor;
-
-//TODO when camera moves a lot when there is no clouds the background looks jank
-if(voxelInfo.reprojection!=reprojection && valid)
-{
-	outFragColor = texture(previousFrameTex, prevUV);
-	return;
-}
+    if(voxelInfo.reprojection!=reprojection && valid)
+    {
+        outFragColor = texture(previousFrameTex, prevUV);
+        return;
+    }
 
 	float tMin=0;
 
@@ -128,7 +126,7 @@ if(voxelInfo.reprojection!=reprojection && valid)
 	float cosAngle = dot(rayDir, toSun);
 	float eccentricity=0.7;
 
-	float phase = max(HenyeyGreenstein(cosAngle, eccentricity), voxelInfo.silverIntensity*HenyeyGreenstein(cos(cosAngle),0.90-voxelInfo.silverSpread)) ;
+	float phase = max(HenyeyGreenstein(cosAngle, eccentricity), voxelInfo.silverIntensity*HenyeyGreenstein(cos(cosAngle),0.90-voxelInfo.silverSpread));
 
 	vec3 backgroundColor = texture(backgroundTex, uv).xyz;
 
@@ -150,89 +148,85 @@ if(voxelInfo.reprojection!=reprojection && valid)
 
     int hits =0;
 
-while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps && hits <20)
-{
-    vec3 samplePos = rayOrigin + (rayDir * t);
-    if (!insideBounds(samplePos, voxelGridMin, voxelGridMax)) 
+    while (t<=maxSteps && I < 1.0 && transmit > 0.01 && steps < maxSteps && hits <20)
     {
-        t += maxStep; 
-        continue;
-    }
-    float jitter = (noise.b * (random((gl_FragCoord.xy)- 0.5)));
-	t+= jitter + minStep;
-    vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
-    uvw = clamp(uvw, vec3(0.0), vec3(1.0));
-    float density = texture(voxelBuffer, uvw).r;
-
-    if (density > 0.001)
-    {
-        if(fineMarch==false)
+        vec3 samplePos = rayOrigin + (rayDir * t);
+        if (!insideBounds(samplePos, voxelGridMin, voxelGridMax)) 
         {
-            fineMarch = true;
-            t-=maxStep;
-            emptySamples = 0;
+            t += maxStep; 
             continue;
         }
-        hits++;
-        float stepSize = minStep;
-        float attenuatedDensity = density * stepSize;
+        float jitter = (noise.b * (random((gl_FragCoord.xy)- 0.5)));
+        t+= jitter + minStep;
+        vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
+        uvw = clamp(uvw, vec3(0.0), vec3(1.0));
+        float density = texture(voxelBuffer, uvw).r;
 
-    const int NUM_SUN_SAMPLES = 6;
-    float coneAngle = radians(10.0);
-    float sunI = 0.0;
-
-    float sunOcclusion = 1.0;
-    for (int i = 0; i < NUM_SUN_SAMPLES; ++i) 
-    {
-        vec2 rand = fract(noise.xy + float(i));
-        vec3 sunRay = sample_cone(toSun, coneAngle, rand);
-        float sunT = jitter + float(i) * sunStepSize;
-        vec3 sunSamplePos = samplePos + sunRay * sunT;
-        if (!insideBounds(sunSamplePos, voxelGridMin, voxelGridMax)) continue;
-
-        vec3 sunUVW = (sunSamplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
-        float sunDensity = texture(voxelBuffer, sunUVW).r;
-        sunOcclusion *= exp(-sunDensity * sunStepSize);
-    }
-    //TODO make 10 sun intensity from cpu
-        sunI = sunOcclusion * 10.0;
-        sunI /= float(NUM_SUN_SAMPLES);
-
-        float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
-        I += transmit * phase * sunI * powder(density) * multiScatterApprox;
-        scatteredLight += transmit * powder(density)  * phase * sunI;
-        transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
-        
-        t += stepSize;
-
-    }
-    else
-    {
-        emptySamples++;
-        if (emptySamples >= maxEmptySamples)
+        if (density > 0.001)
         {
-            fineMarch = false;
-            t += maxStep;
-        }
-        else if (fineMarch)
-        {
-            t += minStep;
+            if(fineMarch==false)
+            {
+                fineMarch = true;
+                t-=maxStep;
+                emptySamples = 0;
+                continue;
+            }
+            hits++;
+            float stepSize = minStep;
+            float attenuatedDensity = density * stepSize;
+
+            const int NUM_SUN_SAMPLES = 6;
+            float coneAngle = radians(10.0);
+            float sunI = 0.0;
+
+            float sunOcclusion = 1.0;
+            for (int i = 0; i < NUM_SUN_SAMPLES; ++i) 
+            {
+                vec2 rand = fract(noise.xy + float(i));
+                vec3 sunRay = sample_cone(toSun, coneAngle, rand);
+                float sunT = jitter + float(i) * sunStepSize;
+                vec3 sunSamplePos = samplePos + sunRay * sunT;
+                if (!insideBounds(sunSamplePos, voxelGridMin, voxelGridMax)) continue;
+
+                vec3 sunUVW = (sunSamplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
+                float sunDensity = texture(voxelBuffer, sunUVW).r;
+                sunOcclusion *= exp(-sunDensity * sunStepSize);
+            }
+            sunI = sunOcclusion * 10.0;
+            sunI /= float(NUM_SUN_SAMPLES);
+
+            float multiScatterApprox = 1.0 / (1.0 + density * density * 0.5);
+            I += transmit * phase * sunI * powder(density) * multiScatterApprox;
+            scatteredLight += transmit * powder(density)  * phase * sunI;
+            transmit *= max((beer(density) + powder(density)), beer(density * 0.25) * 0.7) * (1.0 - voxelInfo.outScatterMultiplier);
+            
+            t += stepSize;
         }
         else
         {
-            t += maxStep;
+            emptySamples++;
+            if (emptySamples >= maxEmptySamples)
+            {
+                fineMarch = false;
+                t += maxStep;
+            }
+            else if (fineMarch)
+            {
+                t += minStep;
+            }
+            else
+            {
+                t += maxStep;
+            }
         }
-    }
 
-    steps++;
-}
+        steps++;
+    }
     float ambientBoost = smoothstep(0.0, 0.5 , 1.0 - transmit); 
     I +=  0.4 * ambientBoost;
 
     vec3 godrayColor = sunlightColor * scatteredLight * I;
     finalColor = (godrayColor + sunlightColor * I )+ (backgroundColor * transmit);
     
-	outFragColor =vec4(finalColor , 1.0);
-
-    
+    outFragColor =vec4(finalColor , 1.0);    
 }
