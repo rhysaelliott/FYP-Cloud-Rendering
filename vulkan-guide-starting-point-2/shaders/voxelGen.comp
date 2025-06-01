@@ -72,7 +72,7 @@ void main()
     float fbm = dot(shapeNoise, voxelGenInfo.shapeNoiseWeights) * h;
     float detailFbm = dot(detailNoise, voxelGenInfo.detailNoiseWeights) * (1.0-h);
 
-    if(fbm<=0.15 ||shapeNoise.r < 0.3 || shapeNoise.g < 0.3 || shapeNoise.b < 0.3)
+    if(fbm<=0.15)
     {
         imageStore(densityTex, pos, vec4(density,0,0,0));
         return;
@@ -80,7 +80,7 @@ void main()
     else
     {
         float invFbm = saturate(1.0 - fbm);
-        density = saturate(fbm - detailFbm * invFbm * invFbm * invFbm);
+        density = saturate(fbm - (detailFbm * (invFbm * invFbm * invFbm)));
 
         density *= smoothstep(0.0, 0.9, edgeDistance);
 

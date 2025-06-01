@@ -99,7 +99,7 @@ void main()
     vec2 noiseUV = mod(gl_FragCoord.xy, 64.0) / 64.0;
     vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
 
-    int reprojection = int(floor(noise.r * 4.0));
+    int reprojection = int(floor(noise.r * 2.0));
     bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
     vec3 finalColor;
 
@@ -134,7 +134,7 @@ void main()
 
 	const float minStep = 0.5;
 	const float maxStep = 5.0;
-	const int maxSteps = 500;
+	const int maxSteps = 1000;
 
 	float I = 0.0;
     float scatteredLight = 0.0;

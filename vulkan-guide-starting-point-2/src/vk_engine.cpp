@@ -1190,7 +1190,7 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
         //.use_default_format_selection()
         .set_desired_format(VkSurfaceFormatKHR{ .format = _swapchainImageFormat,.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         //use vsync present mode
-        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
         .set_desired_extent(width, height)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build()
@@ -1431,7 +1431,7 @@ void VulkanEngine::update_volumetrics()
     _cloudVoxels.GPUVoxelInfo.screenResolution.x = _backgroundImage.imageExtent.width;
     _cloudVoxels.GPUVoxelInfo.screenResolution.y = _backgroundImage.imageExtent.height;
 
-    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 4;
+    _cloudVoxels.GPUVoxelInfo.reprojection = (_cloudVoxels.GPUVoxelInfo.reprojection +1) % 2;
     _voxelGenInfo.reprojection = (_voxelGenInfo.reprojection + 1) % 4;
 
 }
@@ -2174,8 +2174,8 @@ void VulkanEngine::run()
             {
                 if (ImGui::BeginTabItem("clouds"))
                 {
-                    static float yawRad = glm::radians( - 90.0f);
-                    static float pitchRad = glm::radians( - 89.0f);
+                    static float yawRad = glm::radians( - 89.0f);
+                    static float pitchRad = glm::radians( - 90.0f);
 
                     if (ImGui::Button("Reset All"))
                     {
@@ -2193,8 +2193,8 @@ void VulkanEngine::run()
 
             
 
-                        ImGui::SliderAngle("Yaw", &yawRad, -90.0f, 90.0f);
-                        ImGui::SliderAngle("Pitch", &pitchRad, -89.9f, 89.9f);
+                        ImGui::SliderAngle("Yaw", &yawRad, -89.0f, 89.0f);
+                        ImGui::SliderAngle("Pitch", &pitchRad, -90.0f, 90.0f);
 
                         sceneData.sunlightDirection = glm::normalize(glm::vec4(
                             glm::cos(pitchRad) * glm::cos(yawRad),
@@ -2219,11 +2219,14 @@ void VulkanEngine::run()
                         ImGui::SliderFloat("Density Multiplier", &_voxelGenInfo.densityMultiplier, 0.f, 10.f, "%.3f");
                         ImGui::SliderFloat("Height Map Factor", &_voxelGenInfo.heightMapFactor, 0.85f, 1.f, "%.3f");
 
-                        ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 100.f, "%.1f");
-                        ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.f, 100.f, "%.1f");
+                        ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 50.f, "%.1f");
+                        ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.f, 50.f, "%.1f");
 
                         ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.0f, 1.0f);
                         _cloudVoxels.GPUVoxelInfo.bounds = glm::max(_cloudVoxels.GPUVoxelInfo.bounds, glm::vec4(1.0f));
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::scale(mainDrawContext.VolumetricSurfaces[0].transform,
+                            glm::vec3(_cloudVoxels.GPUVoxelInfo.bounds.x, _cloudVoxels.GPUVoxelInfo.bounds.y, _cloudVoxels.GPUVoxelInfo.bounds.z));
                     }
 
                     ImGui::Separator();
