@@ -40,7 +40,7 @@ void Camera::processSDLEvent(SDL_Event& e)
 		if (e.type == SDL_MOUSEWHEEL)
 		{
 			distanceToTarget -= e.wheel.y;
-			distanceToTarget = glm::clamp(distanceToTarget, 1.0f, 500.0f);
+			distanceToTarget = glm::clamp(distanceToTarget, 1.0f, 1000.0f);
 		}
 		return;
 	}

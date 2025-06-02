@@ -2176,17 +2176,38 @@ void VulkanEngine::run()
                 {
                     static float yawRad = glm::radians( - 89.0f);
                     static float pitchRad = glm::radians( - 90.0f);
-
-                    if (ImGui::Button("Reset All"))
+                    ImGui::SetWindowFontScale(1.5f);
+                    if (ImGui::Button("Preset 1"))
                     {
                         _cloudVoxels.GPUVoxelInfo = GPUVoxelBuffer(); 
                         _voxelGenInfo = GPUVoxelGenBuffer();
+                        mainCamera.distanceToTarget = 200.f;
                         sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
                         sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
                         yawRad = glm::radians(-89.0f);
                         pitchRad = glm::radians(-89.0f);
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Preset 2"))
+                    {
+                        _cloudVoxels.GPUVoxelInfo = GPUVoxelBuffer();
+                        _voxelGenInfo = GPUVoxelGenBuffer();
+                        
+                        mainCamera.distanceToTarget = 500.f;
+                        mainCamera.pitch = 0.5f;
 
+                        sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
+                        sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
+                        _voxelGenInfo.shapeNoiseWeights = glm::vec4(0.675f, 0.505f, 0.329f, 0.17f);
+                        _voxelGenInfo.detailNoiseWeights = glm::vec4(0.42f, 1.0f, 1.0f, 0.365f);
+                        _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(700, 400, 700,1);
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::scale(mainDrawContext.VolumetricSurfaces[0].transform,
+                            glm::vec3(_cloudVoxels.GPUVoxelInfo.bounds.x, _cloudVoxels.GPUVoxelInfo.bounds.y, _cloudVoxels.GPUVoxelInfo.bounds.z));
+                        yawRad = glm::radians(-89.0f);
+                        pitchRad = glm::radians(-89.0f);
+                    }
+                    ImGui::SetWindowFontScale(1.0f);
                     if (ImGui::CollapsingHeader("Sunlight", ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         ImGui::ColorPicker3("Sunlight Color", glm::value_ptr(sceneData.sunlightColor));
