@@ -207,13 +207,13 @@ void VulkanEngine::init_swapchain()
 {
     create_swapchain(_windowExtent.width, _windowExtent.height);
 
+
     VkExtent3D drawImageExtent =
     {
-        _windowExtent.width,
-        _windowExtent.height,
+        _windowExtent.width / 2,
+        _windowExtent.height / 2,
         1
     };
-
     
 
     _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -252,6 +252,7 @@ void VulkanEngine::init_swapchain()
     backgroundImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
     backgroundImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    backgroundImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     VkImageCreateInfo bimg_info =
         vkinit::image_create_info(_backgroundImage.imageFormat, backgroundImageUsages, drawImageExtent);
@@ -358,7 +359,7 @@ void VulkanEngine::init_descriptors()
         _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
 
         DescriptorWriter writer;
-        writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        writer.write_image(0, _backgroundImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
         writer.update_set(_device, _drawImageDescriptors);
     }
@@ -1486,58 +1487,50 @@ void VulkanEngine::draw()
     //record to command buffer
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-    draw_background(cmd);
-
-    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-
-    draw_voxel_grid(cmd);
-
-    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-   // draw_geometry(cmd);
-
-    //use background image to draw volumetrics
-
-    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-    vkutil::copy_image_to_image(cmd, _drawImage.image, _backgroundImage.image, _drawExtent, _drawExtent);
-
     if (!_renderedOnce)
     {
-        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        vkutil::copy_image_to_image(cmd, _drawImage.image, _drawImageHistory.image, _drawExtent, _drawExtent);
-        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         _renderedOnce = true;
     }
     else
     {
-        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+        vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+        vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    draw_background(cmd);
+
+    draw_voxel_grid(cmd);
+
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+   // draw_geometry(cmd);
+
+    vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);   
+    
+
+    vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
 
     draw_volumetrics(cmd);
 
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     vkutil::transition_image(cmd, _drawImageHistory.image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vkutil::copy_image_to_image(cmd, _drawImage.image, _drawImageHistory.image, _drawExtent, _drawExtent);
 
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
-
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     draw_imgui(cmd, _swapchainImageViews[swapchainImageIndex]);
 
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 
     VK_CHECK(vkEndCommandBuffer(cmd));
@@ -1599,7 +1592,7 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
 
-    vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
+    vkCmdDispatch(cmd, std::ceil(_drawExtent.width * 2 / 16.0), std::ceil(_drawExtent.height * 2/ 16.0), 1);
 }
 
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
@@ -1720,7 +1713,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     }
 
     VkRenderingAttachmentInfo colorAttachment =
-        vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        vkinit::attachment_info(_backgroundImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingAttachmentInfo depthAttachment =
         vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
@@ -2207,6 +2200,26 @@ void VulkanEngine::run()
                         yawRad = glm::radians(-89.0f);
                         pitchRad = glm::radians(-89.0f);
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Preset 3"))
+                    {
+                        _cloudVoxels.GPUVoxelInfo = GPUVoxelBuffer();
+                        _voxelGenInfo = GPUVoxelGenBuffer();
+
+                        mainCamera.distanceToTarget = 1500.f;
+                        mainCamera.pitch = 0.5f;
+
+                        sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
+                        sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
+                        _voxelGenInfo.shapeNoiseWeights = glm::vec4(0.675f, 0.505f, 0.329f, 0.17f);
+                        _voxelGenInfo.detailNoiseWeights = glm::vec4(0.42f, 1.0f, 1.0f, 0.365f);
+                        _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(2500, 1500, 2500, 1);
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+                        mainDrawContext.VolumetricSurfaces[0].transform = glm::scale(mainDrawContext.VolumetricSurfaces[0].transform,
+                            glm::vec3(_cloudVoxels.GPUVoxelInfo.bounds.x, _cloudVoxels.GPUVoxelInfo.bounds.y, _cloudVoxels.GPUVoxelInfo.bounds.z));
+                        yawRad = glm::radians(-89.0f);
+                        pitchRad = glm::radians(-89.0f);
+                    }
                     ImGui::SetWindowFontScale(1.0f);
                     if (ImGui::CollapsingHeader("Sunlight", ImGuiTreeNodeFlags_DefaultOpen))
                     {
@@ -2243,7 +2256,7 @@ void VulkanEngine::run()
                         ImGui::SliderFloat("Cloud Speed", &_voxelGenInfo.cloudSpeed, 0.f, 50.f, "%.1f");
                         ImGui::SliderFloat("Detail Speed", &_voxelGenInfo.detailSpeed, 0.f, 50.f, "%.1f");
 
-                        ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.0f, 1.0f);
+                        ImGui::DragFloat3("Cloud Bounds", glm::value_ptr(_cloudVoxels.GPUVoxelInfo.bounds), 1.0f, 1.0f, 2500.f);
                         _cloudVoxels.GPUVoxelInfo.bounds = glm::max(_cloudVoxels.GPUVoxelInfo.bounds, glm::vec4(1.0f));
                         mainDrawContext.VolumetricSurfaces[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
                         mainDrawContext.VolumetricSurfaces[0].transform = glm::scale(mainDrawContext.VolumetricSurfaces[0].transform,
