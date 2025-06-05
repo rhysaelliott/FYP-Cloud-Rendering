@@ -210,8 +210,8 @@ void VulkanEngine::init_swapchain()
 
     VkExtent3D drawImageExtent =
     {
-        _windowExtent.width / 2,
-        _windowExtent.height / 2,
+        _windowExtent.width,
+        _windowExtent.height,
         1
     };
     
@@ -1592,7 +1592,7 @@ void VulkanEngine::draw_background(VkCommandBuffer cmd)
 
     vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
 
-    vkCmdDispatch(cmd, std::ceil(_drawExtent.width * 2 / 16.0), std::ceil(_drawExtent.height * 2/ 16.0), 1);
+    vkCmdDispatch(cmd, std::ceil(_drawExtent.width/ 16.0), std::ceil(_drawExtent.height/ 16.0), 1);
 }
 
 void VulkanEngine::draw_voxel_grid(VkCommandBuffer cmd)
