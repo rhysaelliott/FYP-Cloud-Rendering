@@ -58,7 +58,7 @@ struct CloudInstance
 	int index;
 };
 
-#define NUM_OF_BILLBOARDS 128
+#define NUM_OF_BILLBOARDS 4
 
 struct BillboardData
 {

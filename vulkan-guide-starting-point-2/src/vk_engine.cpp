@@ -125,7 +125,7 @@ void VulkanEngine::init()
 
     init_imgui();
 
-    std::string structurePath = { "..\\..\\assets\\structure.glb" };
+    std::string structurePath = { "..\\..\\assets\\cube.glb" };
     auto structureFile = loadGltf(this, structurePath);
 
     assert(structureFile.has_value());
@@ -940,7 +940,7 @@ void VulkanEngine::init_default_data()
     sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
     sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
 
-
+    
 
     _renderTimeTimer = new Timer("Render Time");
 }
@@ -1403,7 +1403,11 @@ void VulkanEngine::update_scene()
     mainDrawContext.OpaqueSurfaces.clear();
     mainDrawContext.TransparentSurfaces.clear();
 
-    //loadedScenes["structure"]->Draw(glm::mat4{ 1.f }, mainDrawContext);
+    glm::mat4 cubeMatrix = glm::mat4(1.f);
+    cubeMatrix = glm::translate(cubeMatrix, glm::vec3(0.f, 0.f, 0.f));
+
+
+    loadedScenes["structure"]->Draw(cubeMatrix, mainDrawContext);
 
     mainCamera.update();
     sceneData.view = mainCamera.getViewMatrix();
@@ -1510,7 +1514,7 @@ void VulkanEngine::draw()
 
     vkutil::transition_image(cmd, _backgroundImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-   // draw_geometry(cmd);
+    draw_geometry(cmd);
 
     vkutil::transition_image(cmd, _cloudVoxelImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);   
     
@@ -1891,7 +1895,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     }
     for (auto r : mainDrawContext.BillboardSurfaces)
     {
-        draw(r);
+        //draw(r);
     }
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
@@ -2188,10 +2192,10 @@ void VulkanEngine::run()
                         
                         mainCamera.distanceToTarget = 500.f;
                         mainCamera.pitch = 0.5f;
-
+                        _voxelGenInfo.heightMapFactor = 0.9;
                         sceneData.sunlightColor = glm::vec4(0.81f, 0.75f, 0.68f, 1.0f);
                         sceneData.sunlightDirection = glm::vec4(0.0f, -1.f, 0.0f, 0.0f);
-                        _voxelGenInfo.shapeNoiseWeights = glm::vec4(0.675f, 0.505f, 0.329f, 0.17f);
+                        _voxelGenInfo.shapeNoiseWeights = glm::vec4(0.675f, 0.535f, 0.33f, 0.25f);
                         _voxelGenInfo.detailNoiseWeights = glm::vec4(0.42f, 1.0f, 1.0f, 0.365f);
                         _cloudVoxels.GPUVoxelInfo.bounds = glm::vec4(700, 400, 700,1);
                         mainDrawContext.VolumetricSurfaces[0].transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
@@ -2271,7 +2275,9 @@ void VulkanEngine::run()
                         ImGui::SliderFloat("Silver Intensity", &_cloudVoxels.GPUVoxelInfo.silverIntensity, 0.01f, 1.5f, "%.3f");
                         ImGui::SliderFloat("Silver Spread", &_cloudVoxels.GPUVoxelInfo.silverSpread, 0.01f, 1.5f, "%.3f");
                     }
+
                     ImGui::EndTabItem();
+
                 }
 
                 ImGui::EndTabBar();
