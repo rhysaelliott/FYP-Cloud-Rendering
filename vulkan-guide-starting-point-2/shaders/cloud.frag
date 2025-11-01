@@ -97,7 +97,7 @@ void main()
     vec2 prevUV = (prevClip.xy / prevClip.w) * 0.5 + 0.5;
 
     vec2 noiseUV = mod(gl_FragCoord.xy, 64.0) / 64.0;
-    vec3 noise = texture(blueNoiseTex, noiseUV).rgb; 
+    float noise = fract(dot(floor(ndc), vec2(0.06711056, 0.00583715)) * 52.9829189); 
 
     int reprojection = int(floor(noise.r * 2.0));
     bool valid = all(greaterThanEqual(prevUV, vec2(0.0))) && all(lessThanEqual(prevUV, vec2(1.0)));
@@ -156,7 +156,7 @@ void main()
             t += maxStep; 
             continue;
         }
-        float jitter = (noise.b * (random((gl_FragCoord.xy)- 0.5)));
+        float jitter = (noise * (random((gl_FragCoord.xy)- 0.5)));
         t+= jitter + minStep;
         vec3 uvw = (samplePos - voxelGridMin) / (voxelGridMax - voxelGridMin);
         uvw = clamp(uvw, vec3(0.0), vec3(1.0));
@@ -182,7 +182,7 @@ void main()
             float sunOcclusion = 1.0;
             for (int i = 0; i < NUM_SUN_SAMPLES; ++i) 
             {
-                vec2 rand = fract(noise.xy + float(i));
+                vec2 rand =vec2(fract(noise + float(i)));
                 vec3 sunRay = sample_cone(toSun, coneAngle, rand);
                 float sunT = jitter + float(i) * sunStepSize;
                 vec3 sunSamplePos = samplePos + sunRay * sunT;
